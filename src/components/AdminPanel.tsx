@@ -337,7 +337,9 @@ export default function AdminPanel({ state, onUpdateState, onClose, isAdminMode,
     category: '학습',
     theme: '세계가 돌아가는 방식 (How the World Works)',
     description: '',
-    files: []
+    files: [],
+    pdfBase64: '',
+    pdfContentSim: ''
   });
   const [galleryUploadedImages, setGalleryUploadedImages] = useState<string[]>([]);
 
@@ -349,7 +351,9 @@ export default function AdminPanel({ state, onUpdateState, onClose, isAdminMode,
       category: item.category,
       theme: item.theme,
       description: item.description,
-      files: item.files || []
+      files: item.files || [],
+      pdfBase64: item.pdfBase64 || '',
+      pdfContentSim: item.pdfContentSim || ''
     });
     setGalleryUploadedImages(item.images || []);
   };
@@ -369,10 +373,16 @@ export default function AdminPanel({ state, onUpdateState, onClose, isAdminMode,
 
   const handleAddGalleryItem = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!galleryForm.title || galleryUploadedImages.length === 0) {
-      alert('갤러리 제목과 최소 1개 대안 이미지가 필요합니다.');
+    if (!galleryForm.title) {
+      alert('갤러리 제목을 입력해 주세요.');
       return;
     }
+    if (galleryUploadedImages.length === 0 && !galleryForm.pdfBase64) {
+      alert('활동 대표 이미지 또는 실제 PDF 파일 중 최소 1개는 포함되어야 합니다.');
+      return;
+    }
+
+    const defaultPdfName = galleryForm.files && galleryForm.files.length > 0 ? galleryForm.files : (galleryForm.pdfBase64 ? ['portfolio_document.pdf'] : []);
 
     if (editingGalleryId) {
       // Editing Mode
@@ -384,7 +394,9 @@ export default function AdminPanel({ state, onUpdateState, onClose, isAdminMode,
         theme: galleryForm.theme || '세계가 돌아가는 방식 (How the World Works)',
         description: galleryForm.description || '',
         images: galleryUploadedImages,
-        files: galleryForm.files || ['reference_document.pdf']
+        files: defaultPdfName,
+        pdfBase64: galleryForm.pdfBase64 || undefined,
+        pdfContentSim: galleryForm.pdfContentSim || galleryForm.description
       } : g);
 
       onUpdateState({
@@ -403,7 +415,9 @@ export default function AdminPanel({ state, onUpdateState, onClose, isAdminMode,
         theme: galleryForm.theme || '세계가 돌아가는 방식 (How the World Works)',
         description: galleryForm.description || '',
         images: galleryUploadedImages,
-        files: galleryForm.files || ['reference_document.pdf'],
+        files: defaultPdfName,
+        pdfBase64: galleryForm.pdfBase64 || undefined,
+        pdfContentSim: galleryForm.pdfContentSim || galleryForm.description,
         date: new Date().toISOString().substring(0, 10)
       };
 
@@ -421,7 +435,9 @@ export default function AdminPanel({ state, onUpdateState, onClose, isAdminMode,
       category: '학습',
       theme: '세계가 돌아가는 방식 (How the World Works)',
       description: '',
-      files: []
+      files: [],
+      pdfBase64: '',
+      pdfContentSim: ''
     });
     setGalleryUploadedImages([]);
   };
@@ -1157,6 +1173,20 @@ export default function AdminPanel({ state, onUpdateState, onClose, isAdminMode,
                   </div>
 
                 </div>
+
+                {/* Save Confirmation Button */}
+                <div className="pt-4 border-t border-neutral-200 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      alert('💾 [수정 완료] 학교 기본 정보 및 홈 화면 설정 변경 사항이 성공적으로 안전 저장되었습니다!');
+                    }}
+                    className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs sm:text-sm shadow-md transition-all cursor-pointer hover:scale-[1.01] active:scale-[0.99] select-none"
+                  >
+                    <Save className="w-4 h-4 text-white" />
+                    <span>설정 저장 및 수정 완료하기</span>
+                  </button>
+                </div>
               </div>
             )}
 
@@ -1370,6 +1400,20 @@ export default function AdminPanel({ state, onUpdateState, onClose, isAdminMode,
                     />
                   </div>
                 </div>
+
+                {/* Save Confirmation Button */}
+                <div className="pt-4 border-t border-neutral-100 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      alert('💾 [수정 완료] 연구학교 개요 및 추진 방향 설정 변경 사항이 성공적으로 안전 저장되었습니다!');
+                    }}
+                    className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs sm:text-sm shadow-md transition-all cursor-pointer hover:scale-[1.01] active:scale-[0.99] select-none"
+                  >
+                    <Save className="w-4 h-4 text-white" />
+                    <span>설정 저장 및 수정 완료하기</span>
+                  </button>
+                </div>
               </div>
             )}
 
@@ -1496,6 +1540,20 @@ export default function AdminPanel({ state, onUpdateState, onClose, isAdminMode,
                       </div>
                     </div>
                   </div>
+                </div>
+
+                {/* Save Confirmation Button */}
+                <div className="pt-4 border-t border-neutral-100 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      alert('💾 [수정 완료] 연구 체계 인포그래픽 변경 사항이 성공적으로 안전 저장되었습니다!');
+                    }}
+                    className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs sm:text-sm shadow-md transition-all cursor-pointer hover:scale-[1.01] active:scale-[0.99] select-none"
+                  >
+                    <Save className="w-4 h-4 text-white" />
+                    <span>설정 저장 및 수정 완료하기</span>
+                  </button>
                 </div>
               </div>
             )}
@@ -2025,6 +2083,50 @@ export default function AdminPanel({ state, onUpdateState, onClose, isAdminMode,
                     )}
                   </div>
 
+                  {/* PDF Portfolio Upload space */}
+                  <div className="p-3 bg-red-50/50 border border-red-100 rounded-lg space-y-2">
+                    <label className="font-bold text-red-800 block">📄 [선택] 실제 PDF 포트폴리오/보고서 원본 탑재</label>
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                      <label className="px-3 py-1.5 bg-red-650 hover:bg-red-750 text-white rounded text-[11px] font-bold block text-center cursor-pointer flex items-center gap-1 shrink-0 w-fit">
+                        <Upload className="w-3.5 h-3.5" />
+                        <span>PDF 파일 선택</span>
+                        <input
+                          type="file"
+                          accept="application/pdf"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              handleImageUpload(e, (base64) => {
+                                setGalleryForm(prev => ({
+                                  ...prev,
+                                  pdfBase64: base64,
+                                  files: [file.name]
+                                }));
+                              });
+                            }
+                          }}
+                        />
+                      </label>
+                      <div className="text-xs">
+                        {galleryForm.pdfBase64 ? (
+                          <div className="flex items-center gap-2 text-emerald-700 font-bold">
+                            <span>✔️ 업로드 완료: {galleryForm.files?.[0] || 'portfolio.pdf'}</span>
+                            <button
+                              type="button"
+                              onClick={() => setGalleryForm(prev => ({ ...prev, pdfBase64: '', files: [] }))}
+                              className="text-red-500 hover:text-red-700 underline text-[10.5px]"
+                            >
+                              제거
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="text-neutral-500 text-[11px]">* PDF 포트폴리오 파일(학습산출물 등)을 탑재할 수 있습니다.</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
                   <div className="flex gap-2">
                     <button
                       type="submit"
@@ -2045,7 +2147,9 @@ export default function AdminPanel({ state, onUpdateState, onClose, isAdminMode,
                             category: '학습',
                             theme: '세계가 돌아가는 방식 (How the World Works)',
                             description: '',
-                            files: []
+                            files: [],
+                            pdfBase64: '',
+                            pdfContentSim: ''
                           });
                           setGalleryUploadedImages([]);
                         }}

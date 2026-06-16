@@ -1,15 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { AppState, LessonItem, ReportItem } from '../types';
-import { Search, Filter, BookOpen, Clock, Heart, Eye, Info, CheckCircle2, FileDown } from 'lucide-react';
+import { Search, Filter, BookOpen, Clock, Heart, Eye, Info, CheckCircle2, FileDown, Upload, PlusCircle, X, Check, FileText } from 'lucide-react';
 
 interface LessonSectionProps {
   state: AppState;
   currentSubTab: string;
   onViewPlanPdf: (report: ReportItem) => void;
   onIncrementViews: (lessonId: string) => void;
+  onUpdateState?: (newState: AppState) => void;
 }
 
-export default function LessonSection({ state, currentSubTab, onViewPlanPdf, onIncrementViews }: LessonSectionProps) {
+export default function LessonSection({ state, currentSubTab, onViewPlanPdf, onIncrementViews, onUpdateState }: LessonSectionProps) {
   const { lessons, basicInfo } = state;
 
   // Filters State
@@ -17,6 +18,89 @@ export default function LessonSection({ state, currentSubTab, onViewPlanPdf, onI
   const [selectedGrade, setSelectedGrade] = useState('전체');
   const [selectedTheme, setSelectedTheme] = useState('전체');
   const [selectedTeacher, setSelectedTeacher] = useState('전체');
+
+  // Teacher direct upload modal state
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [newTeacher, setNewTeacher] = useState('');
+  const [newGrade, setNewGrade] = useState('5학년');
+  const [newTheme, setNewTheme] = useState('세계가 돌아가는 방식 (How the World Works)');
+  const [newInquiryQuestion, setNewInquiryQuestion] = useState('');
+  const [newCentralIdea, setNewCentralIdea] = useState('');
+  const [newDescription, setNewDescription] = useState('');
+  const [newLessonPlanSim, setNewLessonPlanSim] = useState('');
+  const [newPdfBase64, setNewPdfBase64] = useState('');
+  const [newPdfName, setNewPdfName] = useState('');
+
+  // Handle PDF upload
+  const handleNewPdfUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      if (typeof reader.result === 'string') {
+        setNewPdfBase64(reader.result);
+        setNewPdfName(file.name);
+      }
+    };
+    reader.readAsDataURL(file as any);
+  };
+
+  const handleSubmitLesson = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newTeacher.trim()) {
+      alert('지도교사 이름을 입력해 주세요.');
+      return;
+    }
+    if (!newCentralIdea.trim()) {
+      alert('중심 아이디어(Central Idea)를 입력해 주세요.');
+      return;
+    }
+    if (!newInquiryQuestion.trim()) {
+      alert('탐구 질문(Inquiry Questions)을 입력해 주세요.');
+      return;
+    }
+
+    const newLessonItem: LessonItem = {
+      id: `les-pub-${Date.now()}`,
+      grade: newGrade,
+      theme: newTheme,
+      teacher: newTeacher,
+      centralIdea: newCentralIdea,
+      inquiryQuestion: newInquiryQuestion,
+      concepts: '연구 탐구 중심 개념',
+      direction: '초학문 연계 지도 방향',
+      image: '🎒',
+      description: newDescription || '선생님이 등록하신 수업 자료 설명입니다.',
+      lessonPlanSim: newLessonPlanSim || `본 수업지도안은 ${newTeacher} 교사가 설계한 훌륭한 배움 설계안입니다.\n\n중심 아이디어: ${newCentralIdea}\n탐구 질문: ${newInquiryQuestion}`,
+      pdfBase64: newPdfBase64 || undefined,
+      date: new Date().toISOString().substring(0, 10),
+      views: 1,
+      isOpenLesson: false,
+      materialType: '지도안'
+    };
+
+    if (onUpdateState) {
+      onUpdateState({
+        ...state,
+        lessons: [newLessonItem, ...state.lessons]
+      });
+      alert('🎉 수업나눔 탐구지도안 자료가 성공적으로 추가등록 되었습니다.');
+      // Reset forms
+      setNewTeacher('');
+      setNewGrade('5학년');
+      setNewTheme('세계가 돌아가는 방식 (How the World Works)');
+      setNewInquiryQuestion('');
+      setNewCentralIdea('');
+      setNewDescription('');
+      setNewLessonPlanSim('');
+      setNewPdfBase64('');
+      setNewPdfName('');
+      setShowAddModal(false);
+    } else {
+      alert('업로드 실패: update handler is missing.');
+    }
+  };
 
   // Detail Modal State
   const [selectedLesson, setSelectedLesson] = useState<LessonItem | null>(null);
@@ -183,6 +267,19 @@ export default function LessonSection({ state, currentSubTab, onViewPlanPdf, onI
           </div>
         )}
       </div>
+
+      {/* Teacher Direct Upload Button */}
+      {onUpdateState && (
+        <div className="flex justify-end mb-6">
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs sm:text-sm shadow-xs transition-all hover:scale-[1.01] hover:shadow-md cursor-pointer select-none active:scale-[0.99]"
+          >
+            <PlusCircle className="w-4 h-4 text-blue-100" />
+            <span>글쓰기</span>
+          </button>
+        </div>
+      )}
 
       {/* Grid of Lesson Cards */}
       <h3 className="text-xs font-bold text-neutral-400 tracking-wider font-mono mb-4">
@@ -381,6 +478,184 @@ export default function LessonSection({ state, currentSubTab, onViewPlanPdf, onI
               </button>
             </div>
 
+          </div>
+        </div>
+      )}
+
+      {/* Teacher Direct Lesson Upload Modal Dialogue */}
+      {showAddModal && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 font-sans">
+          <div className="bg-white rounded-2xl w-full max-w-2xl border border-neutral-200 shadow-2xl p-6 relative flex flex-col max-h-[90vh]">
+            
+            {/* Modal Head */}
+            <div className="flex items-center justify-between border-b border-neutral-100 pb-3 mb-4 shrink-0">
+              <div className="flex items-center gap-2">
+                <BookOpen className="w-5 h-5 text-blue-600" />
+                <h3 className="text-base sm:text-lg font-extrabold text-neutral-800">선생님 수업지도안 & 연구자료 업로드</h3>
+              </div>
+              <button 
+                onClick={() => setShowAddModal(false)}
+                className="p-1 rounded-full hover:bg-neutral-100 transition-colors text-neutral-500 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Form Scrollable Body */}
+            <form onSubmit={handleSubmitLesson} className="flex-1 overflow-y-auto space-y-4 pr-1 text-xs sm:text-sm">
+              
+              {/* Teacher name & Grade selection */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="flex flex-col space-y-1">
+                  <label className="font-bold text-neutral-700">👤 지도 교사명 <span className="text-red-500">*</span></label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="예: 최한빛 교사"
+                    value={newTeacher}
+                    onChange={(e) => setNewTeacher(e.target.value)}
+                    className="w-full px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-lg focus:bg-white focus:border-blue-600 focus:outline-hidden font-medium text-neutral-800"
+                  />
+                </div>
+
+                <div className="flex flex-col space-y-1">
+                  <label className="font-bold text-neutral-700">대상 학년</label>
+                  <select
+                    value={newGrade}
+                    onChange={(e) => setNewGrade(e.target.value)}
+                    className="w-full px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-lg focus:outline-hidden text-neutral-700 font-semibold cursor-pointer"
+                  >
+                    {['1학년', '2학년', '3학년', '4학년', '5학년', '6학년'].map(g => (
+                      <option key={g} value={g}>{g}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex flex-col space-y-1">
+                  <label className="font-bold text-neutral-700">탐구주제</label>
+                  <select
+                    value={newTheme}
+                    onChange={(e) => setNewTheme(e.target.value)}
+                    className="w-full px-3 py-1.5 bg-neutral-50 border border-neutral-200 rounded-lg focus:outline-hidden text-neutral-750 font-semibold cursor-pointer border-indigo-100"
+                  >
+                    {[
+                      '우리는 누구인가 (Who We Are)',
+                      '세계가 돌아가는 방식 (How the World Works)',
+                      '우리가 속한 공간과 시간 (Where We Are in Place and Time)',
+                      '우리 자신을 표현하는 방법 (How We Express Ourselves)',
+                      '우리 자신을 조직하는 방식 (How We Organize Ourselves)',
+                      '우리 모두의 지구 (Sharing the Planet)'
+                    ].map(t => (
+                      <option key={t} value={t}>{t}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Central Idea & Inquiry Question */}
+              <div className="flex flex-col space-y-1">
+                <label className="font-bold text-neutral-700">💡 중심 아이디어 (Central Idea) <span className="text-red-500">*</span></label>
+                <input
+                  type="text"
+                  required
+                  placeholder="예: 에너지는 형태를 바꾸며 생태계와 인류 문명을 유지한다."
+                  value={newCentralIdea}
+                  onChange={(e) => setNewCentralIdea(e.target.value)}
+                  className="w-full px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-lg focus:bg-white focus:border-blue-600 focus:outline-hidden font-medium text-neutral-800"
+                />
+              </div>
+
+              <div className="flex flex-col space-y-1">
+                <label className="font-bold text-neutral-700">❓ 핵심 탐구 질문 (Inquiry Questions) <span className="text-red-500">*</span></label>
+                <input
+                  type="text"
+                  required
+                  placeholder="예: 에너지의 순환이란 무엇인가? 에너지 보존을 위한 우리의 실천은?"
+                  value={newInquiryQuestion}
+                  onChange={(e) => setNewInquiryQuestion(e.target.value)}
+                  className="w-full px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-lg focus:bg-white focus:border-blue-600 focus:outline-hidden font-medium text-neutral-800"
+                />
+              </div>
+
+              {/* Description summary */}
+              <div className="flex flex-col space-y-1">
+                <label className="font-bold text-neutral-700">📝 수업 개요 및 설명</label>
+                <textarea
+                  placeholder="수업의 전반적인 성격과 전개 목적을 간략히 작성해 주세요."
+                  value={newDescription}
+                  onChange={(e) => setNewDescription(e.target.value)}
+                  rows={2}
+                  className="w-full px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-lg focus:bg-white focus:outline-hidden text-neutral-805"
+                ></textarea>
+              </div>
+
+              {/* Detailed Simulation Plan */}
+              <div className="flex flex-col space-y-1">
+                <label className="font-bold text-neutral-700">📜 상세 교수학습 지도안 (텍스트 직접 작성)</label>
+                <textarea
+                  placeholder="[도입-전개-정리] 별 교수학습 활동 계획을 상세하게 기록하여 다른 동료 선생님들과 나눔할 수 있습니다."
+                  value={newLessonPlanSim}
+                  onChange={(e) => setNewLessonPlanSim(e.target.value)}
+                  rows={4}
+                  className="w-full px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-lg focus:bg-white focus:outline-hidden text-neutral-805 font-mono text-[11px]"
+                ></textarea>
+              </div>
+
+              {/* PDF File Upload */}
+              <div className="p-3 bg-red-50/50 rounded-xl border border-red-100 space-y-2">
+                <label className="font-bold text-red-800 block">📄 [선택] 실제 수업 지도안 원안 PDF 동반 등록</label>
+                <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                  <label className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-bold block text-center cursor-pointer flex items-center gap-1 shrink-0 w-fit">
+                    <Upload className="w-4 h-4" />
+                    <span>PDF 파일 선택</span>
+                    <input
+                      type="file"
+                      accept="application/pdf"
+                      className="hidden"
+                      onChange={handleNewPdfUpload}
+                    />
+                  </label>
+                  <div className="text-[11px]">
+                    {newPdfBase64 ? (
+                      <div className="flex items-center gap-2 text-emerald-700 font-bold">
+                        <span>✔️ 등록 완료: {newPdfName}</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setNewPdfBase64('');
+                            setNewPdfName('');
+                          }}
+                          className="text-red-600 hover:text-red-800 underline cursor-pointer"
+                        >
+                          제거
+                        </button>
+                      </div>
+                    ) : (
+                      <span className="text-neutral-500">* 동료 선생님들이 내려받아 활용할 상세 PDF 파일을 첨부할 수 있습니다.</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Submit / Cancel Actions */}
+              <div className="pt-4 border-t border-neutral-100 flex justify-end gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setShowAddModal(false)}
+                  className="px-4 py-2 bg-neutral-100 hover:bg-neutral-200 text-neutral-600 rounded-lg text-xs font-bold transition-all cursor-pointer"
+                >
+                  취소
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition-all shadow-xs flex items-center gap-1 cursor-pointer"
+                >
+                  <Check className="w-4 h-4" />
+                  <span>탐구지도안 게시하기</span>
+                </button>
+              </div>
+
+            </form>
           </div>
         </div>
       )}

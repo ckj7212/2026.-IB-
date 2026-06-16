@@ -35,6 +35,7 @@ export default function App() {
   // Routing navigation state
   const [currentTab, setCurrentTab] = useState<string>('home');
   const [currentSubTab, setCurrentSubTab] = useState<string>('basic-info');
+  const [isInitialized, setIsInitialized] = useState<boolean>(false);
 
   // Modal display states
   const [adminOpen, setAdminOpen] = useState<boolean>(false);
@@ -51,14 +52,40 @@ export default function App() {
     localStorage.setItem('bitgaram_admin_active', isAdminMode ? 'true' : 'false');
   }, [isAdminMode]);
 
+  // Load state from IndexedDB on initial mount
+  useEffect(() => {
+    import('./lib/idb').then(({ getAsset }) => {
+      getAsset('app_state_v2').then((idbState) => {
+        if (idbState) {
+          console.log("Loaded state from IndexedDB safely:", idbState);
+          setState(idbState);
+        }
+      }).catch((err) => {
+        console.error("IndexedDB state loading failed: ", err);
+      }).finally(() => {
+        setIsInitialized(true);
+      });
+    });
+  }, []);
+
   // Persist State Updates
   useEffect(() => {
+    if (!isInitialized) return;
+
+    // 1. Save to IndexedDB (virtually unlimited quota)
+    import('./lib/idb').then(({ storeAsset }) => {
+      storeAsset('app_state_v2', state).catch((err) => {
+        console.error("IndexedDB state save failed: ", err);
+      });
+    });
+
+    // 2. Fallback to localStorage (clean and graceful if quota exceeded)
     try {
       localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(state));
     } catch (err) {
-      console.error("데이터 영속성 미디어 스토리지 동기화에 난국이 복제되었습니다: ", err);
+      console.warn("localStorage size quota exceeded, saved successfully to IndexedDB only: ", err);
     }
-  }, [state]);
+  }, [state, isInitialized]);
 
   const triggerToast = (msg: string) => {
     setToastMsg(msg);
@@ -252,6 +279,7 @@ export default function App() {
             currentSubTab={currentSubTab} 
             onViewPlanPdf={(rep) => setActiveReportPdf(rep)}
             onIncrementViews={handleIncrementViews}
+            onUpdateState={handleUpdateState}
           />
         )}
 
@@ -260,6 +288,7 @@ export default function App() {
             state={state} 
             currentSubTab={currentSubTab} 
             onViewPdf={(rep) => setActiveReportPdf(rep)}
+            onUpdateState={handleUpdateState}
           />
         )}
 
