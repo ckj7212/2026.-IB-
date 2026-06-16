@@ -1,0 +1,6 @@
+{
+  "name": "빛가람초등학교 IB PYP 연구학교 포털",
+  "description": "2026학년도 빛가람초등학교 IB PYP 연구학교 운영 내용을 한눈에 확인하고 참여하는 교육 포털 시스템",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
