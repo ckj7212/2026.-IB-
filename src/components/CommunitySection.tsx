@@ -6,11 +6,12 @@ interface CommunitySectionProps {
   state: AppState;
   currentSubTab: string;
   isAdminMode: boolean;
-  onAddPost: (category: '공지' | '의견 나눔' | '질문과 답변' | '공감 게시판', title: string, author: string, content: string) => void;
+  onAddPost: (category: '공지' | '의견 나눔' | '질문과 답변' | '공감 게시판', title: string, author: string, content: string, password?: string) => void;
   onAddComment: (postId: string, author: string, content: string) => void;
   onLikePost: (postId: string) => void;
   onDeletePost: (postId: string) => void;
   onDeleteComment: (postId: string, commentId: string) => void;
+  onUpdateState: (newState: AppState) => void;
 }
 
 // Simple typical Korean profanity filter words
@@ -24,7 +25,8 @@ export default function CommunitySection({
   onAddComment,
   onLikePost,
   onDeletePost,
-  onDeleteComment
+  onDeleteComment,
+  onUpdateState
 }: CommunitySectionProps) {
   const { community } = state;
 
@@ -35,8 +37,22 @@ export default function CommunitySection({
   const [newPostTitle, setNewPostTitle] = useState('');
   const [newPostAuthor, setNewPostAuthor] = useState('');
   const [newPostContent, setNewPostContent] = useState('');
+  const [newPostPassword, setNewPostPassword] = useState('');
   const [formError, setFormError] = useState('');
   const [formSuccess, setFormSuccess] = useState(false);
+
+  // New states for Password Entry & Post Editing Modal
+  const [passwordModalOpen, setPasswordModalOpen] = useState(false);
+  const [selectedPost, setSelectedPost] = useState<CommunityItem | null>(null);
+  const [passwordActionType, setPasswordActionType] = useState<'edit' | 'delete'>('delete');
+  const [enteredPassword, setEnteredPassword] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editTitle, setEditTitle] = useState('');
+  const [editAuthor, setEditAuthor] = useState('');
+  const [editContent, setEditContent] = useState('');
+  const [editError, setEditError] = useState('');
 
   // New comment state
   const [newCommentAuthor, setNewCommentAuthor] = useState('');
@@ -74,8 +90,13 @@ export default function CommunitySection({
     setFormError('');
     setFormSuccess(false);
 
-    if (!newPostTitle.trim() || !newPostAuthor.trim() || !newPostContent.trim()) {
-      setFormError('모든 필드를 작성해주시기 바랍니다.');
+    if (!newPostTitle.trim() || !newPostAuthor.trim() || !newPostContent.trim() || !newPostPassword.trim()) {
+      setFormError('비밀번호를 포함하여 모든 필드를 작성해주시기 바랍니다.');
+      return;
+    }
+
+    if (newPostPassword.trim().length < 4) {
+      setFormError('비밀번호는 최소 4자리 이상으로 설정해 주세요.');
       return;
     }
 
@@ -88,13 +109,89 @@ export default function CommunitySection({
     const cleanTitle = filterSlangText(newPostTitle);
     const cleanContent = filterSlangText(newPostContent);
 
-    onAddPost(activeCategory, cleanTitle, newPostAuthor.trim(), cleanContent);
+    onAddPost(activeCategory, cleanTitle, newPostAuthor.trim(), cleanContent, newPostPassword.trim());
     
     setNewPostTitle('');
     setNewPostAuthor('');
     setNewPostContent('');
+    setNewPostPassword('');
     setFormSuccess(true);
     setTimeout(() => setFormSuccess(false), 3000);
+  };
+
+  const handleOpenPasswordModal = (post: CommunityItem, actionType: 'edit' | 'delete') => {
+    setSelectedPost(post);
+    setPasswordActionType(actionType);
+    setEnteredPassword('');
+    setPasswordError('');
+    setPasswordModalOpen(true);
+  };
+
+  const handleVerifyPasswordAndExecute = (e: React.FormEvent) => {
+    e.preventDefault();
+    setPasswordError('');
+
+    if (!selectedPost) return;
+
+    if (!selectedPost.password) {
+      setPasswordError('이 게시물은 시스템 등록 초기 게시물로서, 비밀번호를 통한 수정/삭제가 제한됩니다. (관리자 문의 혹은 새 글을 작성해 테스트해 주세요)');
+      return;
+    }
+
+    if (selectedPost.password !== enteredPassword) {
+      setPasswordError('비밀번호가 일치하지 않습니다. 다시 입력해 주세요.');
+      return;
+    }
+
+    // Password correct!
+    if (passwordActionType === 'delete') {
+      onDeletePost(selectedPost.id);
+      setPasswordModalOpen(false);
+      setSelectedPost(null);
+      setEnteredPassword('');
+    } else if (passwordActionType === 'edit') {
+      setEditTitle(selectedPost.title);
+      setEditAuthor(selectedPost.author);
+      setEditContent(selectedPost.content);
+      setEditError('');
+      
+      setPasswordModalOpen(false);
+      setEnteredPassword('');
+      setEditModalOpen(true);
+    }
+  };
+
+  const handleSaveEdit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setEditError('');
+
+    if (!editTitle.trim() || !editAuthor.trim() || !editContent.trim()) {
+      setEditError('모든 필드를 입력해 주시기 바랍니다.');
+      return;
+    }
+
+    const cleanTitle = filterSlangText(editTitle);
+    const cleanContent = filterSlangText(editContent);
+
+    const updatedCommunity = state.community.map(post => {
+      if (post.id === selectedPost?.id) {
+        return {
+          ...post,
+          title: cleanTitle,
+          author: editAuthor.trim(),
+          content: cleanContent,
+        };
+      }
+      return post;
+    });
+
+    onUpdateState({
+      ...state,
+      community: updatedCommunity
+    });
+
+    setEditModalOpen(false);
+    setSelectedPost(null);
   };
 
   const handleCreateComment = (e: React.FormEvent, postId: string) => {
@@ -195,6 +292,31 @@ export default function CommunitySection({
                       >
                         <Heart className="w-3.5 h-3.5 fill-rose-500" />
                         <span>{post.likes}</span>
+                      </button>
+
+                      {/* Edit/Delete with Password for users */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenPasswordModal(post, 'edit');
+                        }}
+                        className="flex items-center gap-1 text-[11px] font-bold text-neutral-600 hover:text-blue-700 bg-neutral-100 hover:bg-blue-50 px-2 py-1 rounded-md transition-all cursor-pointer"
+                        title="글 수정하기"
+                      >
+                        <Edit3 className="w-3 h-3" />
+                        <span>수정</span>
+                      </button>
+
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenPasswordModal(post, 'delete');
+                        }}
+                        className="flex items-center gap-1 text-[11px] font-bold text-neutral-600 hover:text-red-700 bg-neutral-100 hover:bg-red-50 px-2 py-1 rounded-md transition-all cursor-pointer"
+                        title="글 삭제하기"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                        <span>삭제</span>
                       </button>
                       
                       {/* Admin Delete */}
@@ -343,6 +465,19 @@ export default function CommunitySection({
             </div>
 
             <div className="space-y-1">
+              <label className="text-[10px] font-bold text-neutral-400 font-sans">수정/삭제 비밀번호</label>
+              <input
+                type="password"
+                required
+                placeholder="비밀번호 4자리 이상 입력"
+                maxLength={20}
+                value={newPostPassword}
+                onChange={(e) => setNewPostPassword(e.target.value)}
+                className="w-full px-3 py-1.5 bg-neutral-50/60 border border-neutral-200 rounded-lg text-xs font-semibold focus:outline-hidden text-neutral-850"
+              />
+            </div>
+
+            <div className="space-y-1">
               <label className="text-[10px] font-bold text-neutral-400 font-sans">기고 본문 내용</label>
               <textarea
                 required
@@ -367,19 +502,167 @@ export default function CommunitySection({
 
             <button
               type="submit"
-              className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg text-xs transition-colors cursor-pointer select-none"
+              className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg text-xs transition-colors cursor-pointer select-none font-sans"
             >
-              기고글 타임라인 전파하기
+              작성하기
             </button>
           </form>
 
           {/* Quick guideline info */}
           <div className="p-3 bg-neutral-50 rounded-lg text-[10px] text-neutral-400 leading-relaxed">
-            <strong>💡 소통 주의점:</strong> 다원적 개방 역량(IB) 가치에 맞춰 나와 다른 Perspective(관점)를 향한 세심하고 우대적인 타인 지지 매너를 수호해주시기 바랍니다.
+            <strong>💡 소통 주의점:</strong> 서로의 생각을 존중하며 함께 배우는 공간입니다. 다양한 의견을 열린 마음으로 경청하고, 배려 있는 언어로 소통해 주세요.
           </div>
 
         </div>
       </div>
+
+      {/* Password verification dialog */}
+      {passwordModalOpen && selectedPost && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fade-in font-sans">
+          <div className="bg-white rounded-xl shadow-2xl border border-neutral-200 w-full max-w-sm overflow-hidden text-neutral-800">
+            <div className="px-4 py-3 border-b border-neutral-100 bg-neutral-50 flex justify-between items-center">
+              <h4 className="text-xs font-black text-neutral-900 tracking-wider">
+                🔒 본인 확인 비밀번호 입력
+              </h4>
+              <button 
+                onClick={() => {
+                  setPasswordModalOpen(false);
+                  setSelectedPost(null);
+                  setEnteredPassword('');
+                }}
+                className="text-neutral-400 hover:text-neutral-600 font-bold cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+            <form onSubmit={handleVerifyPasswordAndExecute} className="p-4 space-y-4">
+              <div className="text-center space-y-1">
+                <p className="text-xs font-extrabold text-neutral-700">
+                  {passwordActionType === 'edit' ? '게시글 수정' : '게시글 삭제'}을 계속하시겠습니까?
+                </p>
+                <p className="text-[10.5px] text-neutral-400 leading-normal">
+                  작성 시 기입하셨던 비밀번호를 입력해 주세요.
+                </p>
+              </div>
+
+              <div className="space-y-1.5 focus-within:text-blue-600">
+                <input
+                  type="password"
+                  required
+                  placeholder="비밀번호 입력"
+                  value={enteredPassword}
+                  onChange={(e) => setEnteredPassword(e.target.value)}
+                  className="w-full text-center tracking-widest text-xs px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-lg focus:outline-hidden focus:border-blue-500 font-bold text-neutral-900"
+                />
+                {passwordError && (
+                  <p className="text-[10px] text-rose-600 font-bold text-center leading-relaxed">
+                    {passwordError}
+                  </p>
+                )}
+              </div>
+
+              <div className="flex gap-2 pt-1 font-sans">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPasswordModalOpen(false);
+                    setSelectedPost(null);
+                    setEnteredPassword('');
+                  }}
+                  className="flex-1 py-1.5 bg-neutral-100 hover:bg-neutral-200 text-neutral-600 font-bold rounded-lg text-xs cursor-pointer text-center"
+                >
+                  취소
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg text-xs cursor-pointer text-center"
+                >
+                  확인
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Post Edit Dialog */}
+      {editModalOpen && selectedPost && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fade-in font-sans">
+          <div className="bg-white rounded-xl shadow-2xl border border-neutral-200 w-full max-w-lg overflow-hidden text-neutral-800">
+            <div className="px-4 py-3 border-b border-neutral-100 bg-neutral-50 flex justify-between items-center">
+              <h4 className="text-xs font-black text-neutral-900 tracking-wider">
+                📝 게시글 내용 수정하기
+              </h4>
+              <button 
+                onClick={() => {
+                  setEditModalOpen(false);
+                  setSelectedPost(null);
+                }}
+                className="text-neutral-400 hover:text-neutral-600 font-bold cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+            <form onSubmit={handleSaveEdit} className="p-5 space-y-4 text-xs sm:text-sm font-sans">
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-neutral-400">기고 작성자명</label>
+                <input
+                  type="text"
+                  required
+                  value={editAuthor}
+                  onChange={(e) => setEditAuthor(e.target.value)}
+                  className="w-full px-3 py-1.5 bg-neutral-50 border border-neutral-200 rounded-lg text-xs font-semibold focus:outline-hidden text-neutral-800"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-neutral-400 font-sans">글 제목</label>
+                <input
+                  type="text"
+                  required
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                  className="w-full px-3 py-1.5 bg-neutral-50 border border-neutral-200 rounded-lg text-xs font-semibold focus:outline-hidden text-neutral-800"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-neutral-400 font-sans">기고 본문 내용</label>
+                <textarea
+                  required
+                  rows={6}
+                  value={editContent}
+                  onChange={(e) => setEditContent(e.target.value)}
+                  className="w-full px-3 py-1.5 bg-neutral-50 border border-neutral-200 rounded-lg text-xs font-semibold focus:outline-hidden text-neutral-800"
+                />
+              </div>
+
+              {editError && (
+                <p className="text-[11px] text-red-650 font-bold">{editError}</p>
+              )}
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditModalOpen(false);
+                    setSelectedPost(null);
+                  }}
+                  className="flex-1 py-2 bg-neutral-100 hover:bg-neutral-200 text-neutral-600 font-bold rounded-lg text-xs cursor-pointer text-center"
+                >
+                  취소
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg text-xs cursor-pointer text-center animate-duration-150"
+                >
+                  변경사항 저장하기
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
     </div>
   );

@@ -104,6 +104,7 @@ export interface CommunityItem {
   title: string;
   author: string;
   content: string;
+  password?: string; // Optional password for users to edit/delete their own posts
   date: string;
   likes: number;
   views: number;

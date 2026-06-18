@@ -67,6 +67,7 @@ export const defaultData: AppState = {
       desc: "연구학교 심사를 거쳐 최종 승인된 2026년도 전체 연간 운영 마스터 플랜 및 예산 활용 계획서입니다.",
       filename: "2026_bitgaram_pyp_research_plan.pdf",
       uploadDate: "2026-03-12",
+      pdfBase64: "data:application/pdf;base64,JVBERi0xLjQKJUltZ2gKMSAwIG9iagogIDw8L1R5cGUvQ2F0YWxvZy9QYWdlcyAyIDAgUj4+CmVuZG9iagoyIDAgb2JqCiAgPDwvVHlwZS9QYWdlcy9LaWRzWzMgMCBSXS9Db3VudCAxPj4KZW5kb2JqCjMgMCBvYmoKICA8PC9UeXBlL1BhZ2UvUGFyZW50IDIgMCBSL01lZGlhQm94WzAgMCA1OTUgODQyXS9SZXNvdXJjZXM8PC9Gb250PDwvRjEgNCAwIFI+Pj4+L0NvbnRlbnRzIDUgMCBSPj4KZW5kb2JqCjQgMCBvYmoKICA8PC9UeXBlL0ZvbnQvU3VidHlwZS9UeXBlMS9CYXNlRm9udC9IZWx2ZXRpY2E+PgplbmRvYmoKNSAwIG9iaagogIDw8L0xlbmd0aCA3Nz4+c3RyZWFtCkJUCi9GMSAxMiBUZgoxMCAwIDAgMTAgNTAgODAwIFRkCihCaXRnYXJhbSBFbGVtZW50YXJ5IFNjaG9vbCBJQiBQWVAgUmVzZWFyY2ggRG9jdW1lbnQpIFRqCkVOCmVuZHN0cmVhbQplbmRvYmoKeHJlZgowIDYKMDAwMDAwMDAwMCA2NTUzNSBmIAowMDAwMDAwMDE1IDAwMDAwIG4gCjAwMDAwMDAwNjkgMDAwMDAgbiAKMDAwMDAwMDEyMSAwMDAwMCBuIAowMDAwMDAwMjQwIDAwMDAwIG4gCjAwMDAwMDAzMTggMDAwMDAgbiAKdHJhaWxlcgogIDw8L1NpemUgNi9Sb290IDEgMCBSPj4Kc3RhcnR4cmVmCjQ0NgotJUVPRg==",
       pdfContentSim: `
 [빛가람초등학교 IB PYP 연구학교 운영 계획서]
 ■ 운영 대상: 빛가람초등학교 전학년 (1~6학년)
@@ -89,6 +90,7 @@ export const defaultData: AppState = {
       desc: "1학기 동안 진행된 학년별 UOI 실천 실적과 정량적 설문조사, 주요 교사/학생 성찰을 중간 정리한 보고서입니다.",
       filename: "2026_bitgaram_pyp_midterm_report.pdf",
       uploadDate: "2026-07-15",
+      pdfBase64: "data:application/pdf;base64,JVBERi0xLjQKJUltZ2gKMSAwIG9iagogIDw8L1R5cGUvQ2F0YWxvZy9QYWdlcyAyIDAgUj4+CmVuZG9iagoyIDAgb2JqCiAgPDwvVHlwZS9QYWdlcy9LaWRzWzMgMCBSXS9Db3VudCAxPj4KZW5kb2JqCjMgMCBvYmoKICA8PC9UeXBlL1BhZ2UvUGFyZW50IDIgMCBSL01lZGlhQm94WzAgMCA1OTUgODQyXS9SZXNvdXJjZXM8PC9Gb250PDwvRjEgNCAwIFI+Pj4+L0NvbnRlbnRzIDUgMCBSPj4KZW5kb2JqCjQgMCBvYmoKICA8PC9UeXBlL0ZvbnQvU3VidHlwZS9UeXBlMS9CYXNlRm9udC9IZWx2ZXRpY2E+PgplbmRvYmoKNSAwIG9iaagogIDw8L0xlbmd0aCA3Nz4+c3RyZWFtCkJUCi9GMSAxMiBUZgoxMCAwIDAgMTAgNTAgODAwIFRkCihCaXRnYXJhbSBFbGVtZW50YXJ5IFNjaG9vbCBJQiBQWVAgUmVzZWFyY2ggRG9jdW1lbnQpIFRqCkVOCmVuZHN0cmVhbQplbmRvYmoKeHJlZgowIDYKMDAwMDAwMDAwMCA2NTUzNSBmIAowMDAwMDAwMDE1IDAwMDAwIG4gCjAwMDAwMDAwNjkgMDAwMDAgbiAKMDAwMDAwMDEyMSAwMDAwMCBuIAowMDAwMDAwMjQwIDAwMDAwIG4gCjAwMDAwMDAzMTggMDAwMDAgbiAKdHJhaWxlcgogIDw8L1NpemUgNi9Sb290IDEgMCBSPj4Kc3RhcnR4cmVmCjQ0NgotJUVPRg==",
       pdfContentSim: `
 [빛가람초등학교 IB PYP 연구학교 1학기 중간 운영 보고서]
 ■ 주요 추진 경과:

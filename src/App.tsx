@@ -52,38 +52,79 @@ export default function App() {
     localStorage.setItem('bitgaram_admin_active', isAdminMode ? 'true' : 'false');
   }, [isAdminMode]);
 
-  // Load state from IndexedDB on initial mount
+  // Load state from server-side JSON database first, then fallback to IndexedDB or localStorage
   useEffect(() => {
-    import('./lib/idb').then(({ getAsset }) => {
-      getAsset('app_state_v2').then((idbState) => {
-        if (idbState) {
+    async function loadInitialState() {
+      try {
+        // Try server-side persistence first
+        const apiResponse = await fetch('/api/state');
+        if (apiResponse.ok) {
+          const apiState = await apiResponse.json();
+          if (apiState && apiState.config && apiState.basicInfo) {
+            console.log("Loaded state from Server-side JSON database successfully:", apiState);
+            setState(apiState);
+            setIsInitialized(true);
+            return;
+          }
+        }
+      } catch (err) {
+        console.warn("Failed to load state from Server API, trying IndexedDB fallback...", err);
+      }
+
+      // Try IndexedDB second
+      try {
+        const { getAsset } = await import('./lib/idb');
+        const idbState = await getAsset('app_state_v2');
+        if (idbState && idbState.config && idbState.basicInfo) {
           console.log("Loaded state from IndexedDB safely:", idbState);
           setState(idbState);
+          setIsInitialized(true);
+          return;
         }
-      }).catch((err) => {
+      } catch (err) {
         console.error("IndexedDB state loading failed: ", err);
-      }).finally(() => {
-        setIsInitialized(true);
-      });
-    });
+      }
+
+      // Keep initialized as true since it will use default/localStorage already initialized in useState
+      setIsInitialized(true);
+    }
+
+    loadInitialState();
   }, []);
 
-  // Persist State Updates
+  // Persist State Updates inside LocalStorage, IndexedDB and Server Filesystem
   useEffect(() => {
     if (!isInitialized) return;
 
-    // 1. Save to IndexedDB (virtually unlimited quota)
+    // 1. Save to Server-side JSON database
+    fetch('/api/state', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(state)
+    })
+    .then(async (res) => {
+      if (!res.ok) {
+        console.error("Server API save returned error status: ", res.status);
+      }
+    })
+    .catch((err) => {
+      console.error("Server state save API failed: ", err);
+    });
+
+    // 2. Save to IndexedDB (virtually unlimited quota for fallback browser session)
     import('./lib/idb').then(({ storeAsset }) => {
       storeAsset('app_state_v2', state).catch((err) => {
         console.error("IndexedDB state save failed: ", err);
       });
     });
 
-    // 2. Fallback to localStorage (clean and graceful if quota exceeded)
+    // 3. Fallback to localStorage (clean and graceful if quota exceeded)
     try {
       localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(state));
     } catch (err) {
-      console.warn("localStorage size quota exceeded, saved successfully to IndexedDB only: ", err);
+      console.warn("localStorage size quota exceeded, saved successfully to server and IndexedDB: ", err);
     }
   }, [state, isInitialized]);
 
@@ -122,7 +163,8 @@ export default function App() {
     category: '공지' | '의견 나눔' | '질문과 답변' | '공감 게시판',
     title: string,
     author: string,
-    content: string
+    content: string,
+    password?: string
   ) => {
     const newPost: CommunityItem = {
       id: `post-${Date.now()}`,
@@ -130,6 +172,7 @@ export default function App() {
       title,
       author,
       content,
+      password: password || '',
       date: new Date().toISOString().substring(0, 10),
       likes: 0,
       views: 1,
@@ -302,6 +345,7 @@ export default function App() {
             onLikePost={handleLikePost}
             onDeletePost={handleDeletePost}
             onDeleteComment={handleDeleteComment}
+            onUpdateState={handleUpdateState}
           />
         )}
 

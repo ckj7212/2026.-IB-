@@ -447,21 +447,36 @@ export default function LessonSection({ state, currentSubTab, onViewPlanPdf, onI
               <div className="pt-4 border-t border-neutral-100">
                 
                 {/* PDF Viewer preview button link */}
-                <div className="p-4 bg-red-50/20 border border-red-200/60 rounded-xl flex items-center justify-between">
-                  <div className="space-y-1">
-                    <span className="text-[10px] font-bold text-red-700 uppercase font-mono tracking-wider block">관련 지도안 (PDF)</span>
-                    <span className="text-xs font-bold text-neutral-700 truncate block">
-                      {selectedLesson.id}_lesson_plan.pdf
-                    </span>
+                {selectedLesson.pdfBase64 ? (
+                  <div className="p-4 bg-red-50/20 border border-red-200/60 rounded-xl flex items-center justify-between">
+                    <div className="space-y-1">
+                      <span className="text-[10px] font-bold text-red-700 uppercase font-mono tracking-wider block">관련 지도안 (PDF)</span>
+                      <span className="text-xs font-bold text-neutral-700 truncate block">
+                        {selectedLesson.id}_lesson_plan.pdf
+                      </span>
+                    </div>
+                    <button
+                      onClick={() => triggerPdfSimulator(selectedLesson)}
+                      className="px-3 py-2 bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg text-xs transition-colors cursor-pointer flex items-center gap-1.5 shrink-0"
+                    >
+                      <BookOpen className="w-4 h-4" />
+                      <span>지도안 바로보기</span>
+                    </button>
                   </div>
-                  <button
-                    onClick={() => triggerPdfSimulator(selectedLesson)}
-                    className="px-3 py-2 bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg text-xs transition-colors cursor-pointer flex items-center gap-1.5 shrink-0"
-                  >
-                    <BookOpen className="w-4 h-4" />
-                    <span>지도안 바로보기</span>
-                  </button>
-                </div>
+                ) : (
+                  <div className="p-4 bg-neutral-50 border border-neutral-150 rounded-xl flex items-center justify-between text-neutral-500">
+                    <div className="flex items-center gap-2">
+                      <FileText className="w-5 h-5 text-neutral-400" />
+                      <div className="space-y-0.5">
+                        <span className="text-[10px] font-bold text-neutral-400 uppercase font-mono tracking-wider block">관련 지도안 (PDF)</span>
+                        <span className="text-xs font-bold text-neutral-500">
+                          첨부파일 없음
+                        </span>
+                      </div>
+                    </div>
+                    <span className="text-neutral-400 text-xs font-medium">등록된 지도안 파일이 없습니다.</span>
+                  </div>
+                )}
 
               </div>
 
