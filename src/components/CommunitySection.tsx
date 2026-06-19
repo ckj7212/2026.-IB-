@@ -120,6 +120,22 @@ export default function CommunitySection({
   };
 
   const handleOpenPasswordModal = (post: CommunityItem, actionType: 'edit' | 'delete') => {
+    if (isAdminMode) {
+      if (actionType === 'delete') {
+        if (window.confirm("이 기고글을 완전 삭제하시겠습니까? (관리자 비밀번호 바이패스 권한)")) {
+          onDeletePost(post.id);
+        }
+      } else if (actionType === 'edit') {
+        setSelectedPost(post);
+        setEditTitle(post.title);
+        setEditAuthor(post.author);
+        setEditContent(post.content);
+        setEditError('');
+        setEditModalOpen(true);
+      }
+      return;
+    }
+
     setSelectedPost(post);
     setPasswordActionType(actionType);
     setEnteredPassword('');

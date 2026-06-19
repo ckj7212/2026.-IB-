@@ -6,11 +6,20 @@ interface ResearchSectionProps {
   state: AppState;
   currentSubTab: string;
   onViewReport: (report: ReportItem) => void;
+  onUpdateState?: (newState: AppState) => void;
+  isAdminMode?: boolean;
 }
 
-export default function ResearchSection({ state, currentSubTab, onViewReport }: ResearchSectionProps) {
+export default function ResearchSection({ 
+  state, 
+  currentSubTab, 
+  onViewReport,
+  onUpdateState,
+  isAdminMode = false
+}: ResearchSectionProps) {
   const { basicInfo, reports, infographic, researchTasks, outcomes } = state;
   const [selectedTask, setSelectedTask] = useState<ResearchTaskItem | null>(null);
+  const [viewingAttachment, setViewingAttachment] = useState<any>(null);
   const [activeThemeTab, setActiveThemeTab] = useState<number>(1);
   const [activeOutcomeTab, setActiveOutcomeTab] = useState<'quantitative' | 'qualitative'>('quantitative');
 
@@ -42,6 +51,70 @@ export default function ResearchSection({ state, currentSubTab, onViewReport }: 
       }
     ];
     return styles[index % styles.length];
+  };
+
+  const handleAddAttachment = (e: React.ChangeEvent<HTMLInputElement>, fileType: 'image' | 'pdf') => {
+    const file = e.target.files?.[0];
+    if (!file || !selectedTask || !onUpdateState) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const base64Data = reader.result as string;
+      const newAttachment = {
+        id: `att-${Date.now()}`,
+        name: file.name,
+        type: fileType,
+        data: base64Data,
+        date: new Date().toISOString().split('T')[0]
+      };
+
+      const updatedTasks = researchTasks.map(t => {
+        if (t.id === selectedTask.id) {
+          const currentAttachments = t.attachments || [];
+          return {
+            ...t,
+            attachments: [...currentAttachments, newAttachment]
+          };
+        }
+        return t;
+      });
+
+      const updatedState = {
+        ...state,
+        researchTasks: updatedTasks
+      };
+
+      onUpdateState(updatedState);
+      const updatedTask = updatedTasks.find(t => t.id === selectedTask.id);
+      if (updatedTask) setSelectedTask(updatedTask);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleDeleteAttachment = (attachmentId: string) => {
+    if (!selectedTask || !onUpdateState) return;
+
+    if (!window.confirm("이 첨부파일을 정말로 삭제하시겠습니까?")) return;
+
+    const updatedTasks = researchTasks.map(t => {
+      if (t.id === selectedTask.id) {
+        const currentAttachments = t.attachments || [];
+        return {
+          ...t,
+          attachments: currentAttachments.filter(a => a.id !== attachmentId)
+        };
+      }
+      return t;
+    });
+
+    const updatedState = {
+      ...state,
+      researchTasks: updatedTasks
+    };
+
+    onUpdateState(updatedState);
+    const updatedTask = updatedTasks.find(t => t.id === selectedTask.id);
+    if (updatedTask) setSelectedTask(updatedTask);
   };
 
   return (
@@ -350,86 +423,176 @@ export default function ResearchSection({ state, currentSubTab, onViewReport }: 
                       Research Task Details
                     </span>
                     <span className="text-neutral-300">|</span>
-                    <span className="text-xs text-neutral-600 font-extrabold">세부내용</span>
+                    <span className="text-xs text-neutral-600 font-extrabold">세부내용 성찰</span>
                   </div>
                   <button 
                     onClick={() => setSelectedTask(null)}
-                    className="p-1 px-2.5 bg-neutral-200 hover:bg-neutral-300 text-neutral-700 hover:text-neutral-900 rounded-lg text-xs font-bold transition-all"
+                    className="p-1 px-2.5 bg-neutral-200 hover:bg-neutral-300 text-neutral-700 hover:text-neutral-900 rounded-lg text-xs font-bold transition-allcursor-pointer"
                   >
                     닫기
                   </button>
                 </div>
-
+ 
                 <div className="p-6 overflow-y-auto space-y-5 font-sans">
                   <div>
-                    <h3 className="text-base sm:text-lg font-extrabold text-neutral-950 tracking-tight">
-                      {selectedTask.title}
+                    <h3 className="text-base sm:text-lg font-extrabold text-neutral-950 tracking-tight leading-snug">
+                      [{selectedTask.taskCode}] {selectedTask.title}
                     </h3>
                   </div>
-
+ 
                   <div className="space-y-4 text-xs sm:text-sm">
-                    <div className="bg-amber-50/50 p-4 rounded-xl border border-amber-200/50">
-                      <strong className="text-amber-800 block mb-1">🔍 1. 추진 배경 (Background)</strong>
+                    {/* Unified 1-4 Cards styling with identical border, padding, theme tone and font sizes */}
+                    <div className="bg-blue-50/10 p-4 rounded-xl border border-neutral-200">
+                      <strong className="text-blue-900 block mb-1.5 font-bold text-xs sm:text-sm flex items-center gap-1.5">
+                        🔍 1. 추진 배경 (Background)
+                      </strong>
                       <p className="text-neutral-700 leading-relaxed text-justify">{selectedTask.bg}</p>
                     </div>
-
-                    <div className="bg-neutral-50 p-4 rounded-xl border border-neutral-200 bg-white">
-                      <strong className="text-neutral-800 block mb-1">🛠️ 2. 핵심 실행 구조 (Actions)</strong>
+ 
+                    <div className="bg-blue-50/10 p-4 rounded-xl border border-neutral-200">
+                      <strong className="text-blue-900 block mb-1.5 font-bold text-xs sm:text-sm flex items-center gap-1.5">
+                        🛠️ 2. 핵심 실행 구조 (Actions)
+                      </strong>
                       <p className="text-neutral-700 leading-relaxed text-justify">{selectedTask.text}</p>
                     </div>
-
-                    <div className="space-y-2">
-                      <strong className="text-blue-900 block font-bold text-xs">📋 3. 구체적 운영 방법 (Methodology)</strong>
-                      <ul className="list-disc pl-5 text-xs text-neutral-600 space-y-1">
+ 
+                    <div className="bg-blue-50/10 p-4 rounded-xl border border-neutral-200 animate-slide-in">
+                      <strong className="text-blue-900 block mb-1.5 font-bold text-xs sm:text-sm flex items-center gap-1.5 animate-pulse-slow">
+                        📋 3. 구체적 운영 방법 (Methodology)
+                      </strong>
+                      <ul className="list-disc pl-5 text-xs text-neutral-700 space-y-1">
                         {selectedTask.methods?.map((m, idx) => (
-                          <li key={idx} className="text-neutral-700">{m}</li>
+                          <li key={idx} className="leading-relaxed text-justify">{m}</li>
                         ))}
                       </ul>
                     </div>
-
-                    <div className="bg-emerald-50/40 p-4 rounded-xl border border-emerald-100">
-                      <strong className="text-emerald-800 block mb-1">💡 4. 실제 학교 적용사례 (Classroom Practice Case)</strong>
+ 
+                    <div className="bg-blue-50/10 p-4 rounded-xl border border-neutral-200">
+                      <strong className="text-blue-900 block mb-1.5 font-bold text-xs sm:text-sm flex items-center gap-1.5">
+                        💡 4. 실제 학교 적용사례 (Classroom Practice Case)
+                      </strong>
                       <ul className="list-disc pl-5 text-xs text-neutral-700 space-y-1">
                         {selectedTask.cases?.map((c, idx) => (
                           <li key={idx} className="leading-relaxed text-justify">{c}</li>
                         ))}
                       </ul>
                     </div>
+ 
+                    {/* Dynamic Case Attachment List & Upload Engine */}
+                    <div className="bg-neutral-50 p-4 rounded-xl border border-neutral-200 space-y-4">
+                      <div className="flex items-center justify-between">
+                        <strong className="text-xs font-bold text-neutral-800 block">
+                          📎 사례 첨부파일 및 산출물 예람 ({selectedTask.attachments?.length || 0}개)
+                        </strong>
+                        <span className="text-[10px] text-neutral-400 font-mono">JPG, PNG, PDF 지원</span>
+                      </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
-                      <div className="bg-neutral-50 p-3.5 rounded-lg border border-neutral-200/60">
-                        <strong className="text-[11.5px] uppercase tracking-wider text-neutral-600 font-mono block">📦 관련 산출물 및 자료 (클릭시 바로가기)</strong>
-                        <ul className="text-xs mt-1.5 space-y-1">
-                          {selectedTask.resources?.map((r, idx) => {
-                            const link = selectedTask.resourceLinks?.[idx];
-                            if (link && link.trim().startsWith('http')) {
-                              return (
-                                <li key={idx} className="truncate">
-                                  <a 
-                                    href={link} 
-                                    target="_blank" 
-                                    rel="noopener noreferrer" 
-                                    className="text-blue-600 hover:text-blue-800 hover:underline font-bold inline-flex items-center gap-1 cursor-pointer"
-                                    title={`${r} 산출물 링크 열기`}
+                      {/* Display individual attachments */}
+                      {selectedTask.attachments && selectedTask.attachments.length > 0 ? (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
+                          {selectedTask.attachments.map((att) => (
+                            <div key={att.id} className="flex items-center justify-between p-2.5 bg-white rounded-lg border border-neutral-200 shadow-3xs hover:border-blue-400 transition-colors">
+                              <div className="flex items-center gap-2 min-w-0 pr-2">
+                                <span className="text-[9px] uppercase font-mono px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 font-black shrink-0">
+                                  {att.type === 'image' ? 'IMAGE' : 'PDF'}
+                                </span>
+                                <span className="text-xs text-neutral-800 font-semibold truncate" title={att.name}>
+                                  {att.name}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-1 shrink-0">
+                                <button
+                                  onClick={() => setViewingAttachment(att)}
+                                  className="px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-[11px] font-bold transition-all cursor-pointer"
+                                >
+                                  보기
+                                </button>
+                                {isAdminMode && (
+                                  <button
+                                    onClick={() => handleDeleteAttachment(att.id)}
+                                    className="px-2 py-1 bg-red-50 hover:bg-red-100 text-red-600 rounded text-[11px] font-semibold transition-all cursor-pointer"
+                                    title="첨부파일 삭제"
                                   >
-                                    📎 {r} <ArrowUpRight className="w-3.5 h-3.5 text-blue-500 inline shrink-0" />
-                                  </a>
+                                    삭제
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-center py-4 bg-white rounded-lg border border-neutral-100">
+                          <p className="text-neutral-400 text-xs italic">등록된 실제 교육활동 사진 또는 첨부 산출물이 없습니다.</p>
+                          {isAdminMode && <p className="text-[10.5px] text-blue-600 font-semibold mt-1">관리자 기능: 하단 업로드 도구를 사용해 학급 활동 사례를 등록하세요.</p>}
+                        </div>
+                      )}
+
+                      {/* Admin upload capabilities */}
+                      {isAdminMode && (
+                        <div className="bg-white p-3 rounded-xl border border-dashed border-blue-200 space-y-2 mt-4">
+                          <span className="text-xs font-bold text-blue-800 flex items-center gap-1">
+                            <Sparkles className="w-3.5 h-3.5" /> [관리자 전용] 현장 기록 및 산출물 파일 업로드
+                          </span>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                            <div>
+                              <span className="block text-[10.5px] text-neutral-500 font-bold mb-1">📷 이미지 사례 추가 (Wonder Wall, 학급 기록 등)</span>
+                              <input 
+                                type="file" 
+                                accept="image/*"
+                                onChange={(e) => handleAddAttachment(e, 'image')}
+                                className="block w-full text-xs text-neutral-500 file:mr-2 file:py-1 file:px-2.5 file:rounded file:border-0 file:text-[11px] file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
+                              />
+                            </div>
+                            <div>
+                              <span className="block text-[10.5px] text-neutral-500 font-bold mb-1">📄 학습 보고서/UOI 산출물 PDF 추가</span>
+                              <input 
+                                type="file" 
+                                accept="application/pdf"
+                                onChange={(e) => handleAddAttachment(e, 'pdf')}
+                                className="block w-full text-xs text-neutral-500 file:mr-2 file:py-1 file:px-2.5 file:rounded file:border-0 file:text-[11px] file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100 cursor-pointer"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+ 
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                      <div className="bg-neutral-50 p-3.5 rounded-lg border border-neutral-200/60 flex flex-col justify-between">
+                        <div>
+                          <strong className="text-[11.5px] uppercase tracking-wider text-neutral-600 font-mono block">📦 연구 산출물 관련 리포트 바로가기</strong>
+                          <ul className="text-xs mt-1.5 space-y-1">
+                            {selectedTask.resources?.map((r, idx) => {
+                              const link = selectedTask.resourceLinks?.[idx];
+                              if (link && link.trim().startsWith('http')) {
+                                return (
+                                  <li key={idx} className="truncate">
+                                    <a 
+                                      href={link} 
+                                      target="_blank" 
+                                      rel="noopener noreferrer" 
+                                      className="text-blue-600 hover:text-blue-800 hover:underline font-bold inline-flex items-center gap-1 cursor-pointer"
+                                      title={`${r} 산출물 링크 열기`}
+                                    >
+                                      📎 {r} <ArrowUpRight className="w-3.5 h-3.5 text-blue-500 inline shrink-0" />
+                                    </a>
+                                  </li>
+                                );
+                              }
+                              return (
+                                <li key={idx} className="truncate text-neutral-700">
+                                  📎 {r}
                                 </li>
                               );
-                            }
-                            return (
-                              <li key={idx} className="truncate text-neutral-700">
-                                📎 {r}
-                              </li>
-                            );
-                          })}
-                          {(!selectedTask.resources || selectedTask.resources.length === 0) && (
-                            <li className="text-[11px] text-neutral-400">등록된 산출물 목록이 없습니다.</li>
-                          )}
-                        </ul>
+                            })}
+                            {(!selectedTask.resources || selectedTask.resources.length === 0) && (
+                              <li className="text-[11px] text-neutral-400">등록된 산출물 목록이 없습니다.</li>
+                            )}
+                          </ul>
+                        </div>
                       </div>
-                      <div className="bg-blue-50/30 p-3.5 rounded-lg border border-blue-100">
-                        <strong className="text-[11.5px] uppercase tracking-wider text-blue-700 font-mono block">📈 도출 성과 및 학생 변화</strong>
+                      <div className="bg-blue-50/30 p-3.5 rounded-lg border border-blue-105">
+                        <strong className="text-[11.5px] uppercase tracking-wider text-blue-700 font-mono block">📈 도출 성과 및 본교 실질 변화</strong>
                         <p className="text-xs text-neutral-700 mt-1.5 leading-relaxed text-justify">
                           {selectedTask.impact}
                         </p>
@@ -437,13 +600,83 @@ export default function ResearchSection({ state, currentSubTab, onViewReport }: 
                     </div>
                   </div>
                 </div>
-
+ 
                 <div className="p-4 border-t border-neutral-100 bg-neutral-50 flex justify-end">
                   <button
                     onClick={() => setSelectedTask(null)}
                     className="px-4 py-2 bg-neutral-800 hover:bg-neutral-900 text-white rounded-lg text-xs font-bold transition-all cursor-pointer"
                   >
                     확인 및 창 닫기
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Attachment Viewer Popup Sub-modal Overlay */}
+          {viewingAttachment && (
+            <div id="attachment-viewer-overlay" className="fixed inset-0 z-[60] flex items-center justify-center bg-black/75 backdrop-blur-xs p-4 animate-fade-in">
+              <div className="bg-white rounded-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden shadow-2xl flex flex-col">
+                <div className="p-4 border-b border-neutral-100 bg-neutral-50 flex justify-between items-center px-6">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-blue-700 bg-blue-50 px-2.5 py-0.5 rounded-full">사례 첨부물 열람</span>
+                    <span className="text-xs text-neutral-850 font-black truncate max-w-[200px] sm:max-w-md">{viewingAttachment.name}</span>
+                  </div>
+                  <button
+                    onClick={() => setViewingAttachment(null)}
+                    className="p-1 px-3 bg-neutral-200 hover:bg-neutral-350 text-neutral-700 font-mono rounded-lg text-xs font-bold transition-all cursor-pointer"
+                  >
+                    닫기 [X]
+                  </button>
+                </div>
+
+                <div className="p-6 overflow-y-auto flex-1 flex flex-col items-center justify-center bg-neutral-150 min-h-[300px]">
+                  {viewingAttachment.type === 'image' ? (
+                    <img 
+                      src={viewingAttachment.data} 
+                      alt={viewingAttachment.name} 
+                      className="max-w-full max-h-[60vh] object-contain rounded-lg shadow-sm border border-neutral-200"
+                    />
+                  ) : (
+                    /* Live simulated report/PDF viewer */
+                    <div className="bg-white w-full rounded-xl border border-neutral-200 shadow-sm overflow-hidden flex flex-col">
+                      <div className="p-4 bg-orange-50 border-b border-orange-100 flex items-center gap-2">
+                        <span className="w-2.5 h-2.5 rounded-full bg-orange-500"></span>
+                        <span className="text-xs font-bold text-orange-900 font-mono select-none">PORTABLE DOCUMENT FORMAT (SIMULATION)</span>
+                      </div>
+                      <div className="p-6 sm:p-8 space-y-4 max-h-[50vh] overflow-y-auto text-neutral-800">
+                        <div className="border-b border-neutral-200 pb-4 text-center">
+                          <h4 className="text-base font-bold text-neutral-900 leading-snug">{viewingAttachment.name}</h4>
+                          <p className="text-[10px] text-neutral-400 mt-1.5 font-mono">Date Attached: {viewingAttachment.date} | Simulated Document Engine v1.1</p>
+                        </div>
+                        
+                        <div className="space-y-3 leading-relaxed text-sm text-neutral-700 text-justify">
+                          <p className="font-semibold text-neutral-950 font-sans">본 문서 파일은 연구학교 사례 산출물로서 첨부 구동된 PDF의 모사 가치 기록물물입니다.</p>
+                          <div className="p-4 bg-neutral-50 rounded-lg border border-neutral-200/50 font-mono text-[11px] whitespace-pre-wrap leading-relaxed">
+                            {`[빛가람초등학교 IB PYP 연구과제 사례 보고서]
+과제 코드: ${selectedTask.taskCode}
+추진 주제: ${selectedTask.title}
+
+본 문서는 실제 교육 현장에서 도출된 핵심 교육 산출물(사례사진, 워크북 기록, 참관성찰편지 등)을 관리지가 전자 첨부하여 가독적으로 열람할 수 있도록 지원하는 포스트 문서 템플릿입니다.
+
+■ 주요 적용 사례 및 학생 성찰 발언록:
+1. 해당 연구과제 실행 후 개념적 학습 인식 및 자기 주도적 문제 해결력 도출 확인
+2. Wonder Wall 및 토의 기록 분석을 통한 교수 학습 설계 고도화
+3. 삼주체(학습자-교원-학부모) 간의 지속가능한 상호 연대지표 증가`}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="p-4 border-t border-neutral-300 bg-neutral-55 flex justify-between items-center px-6">
+                  <span className="text-[10px] text-neutral-400 font-mono">Bitgaram Interactive Document Hub</span>
+                  <button
+                    onClick={() => setViewingAttachment(null)}
+                    className="px-4 py-2 bg-neutral-950 hover:bg-neutral-850 text-white rounded-lg text-xs font-bold font-sans cursor-pointer"
+                  >
+                    열람 창 닫기
                   </button>
                 </div>
               </div>

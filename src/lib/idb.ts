@@ -17,7 +17,7 @@ export function getIDBConnection(): Promise<IDBDatabase> {
   });
 }
 
-export async function storeAsset(key: string, data: Blob | string): Promise<void> {
+export async function storeAsset(key: string, data: any): Promise<void> {
   const db = await getIDBConnection();
   return new Promise((resolve, reject) => {
     const transaction = db.transaction(STORE_NAME, 'readwrite');

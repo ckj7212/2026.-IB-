@@ -56,37 +56,78 @@ export default function App() {
   useEffect(() => {
     async function loadInitialState() {
       try {
-        // Try server-side persistence first
-        const apiResponse = await fetch('/api/state');
-        if (apiResponse.ok) {
-          const apiState = await apiResponse.json();
-          if (apiState && apiState.config && apiState.basicInfo) {
-            console.log("Loaded state from Server-side JSON database successfully:", apiState);
-            setState(apiState);
-            setIsInitialized(true);
-            return;
+        // 1. Try server-side persistence
+        let serverState: AppState | null = null;
+        try {
+          const apiResponse = await fetch('/api/state');
+          if (apiResponse.ok) {
+            const apiState = await apiResponse.json();
+            if (apiState && apiState.config && apiState.basicInfo) {
+              serverState = apiState;
+            }
           }
+        } catch (err) {
+          console.warn("Failed to load state from Server API:", err);
         }
-      } catch (err) {
-        console.warn("Failed to load state from Server API, trying IndexedDB fallback...", err);
-      }
 
-      // Try IndexedDB second
-      try {
-        const { getAsset } = await import('./lib/idb');
-        const idbState = await getAsset('app_state_v2');
-        if (idbState && idbState.config && idbState.basicInfo) {
-          console.log("Loaded state from IndexedDB safely:", idbState);
-          setState(idbState);
-          setIsInitialized(true);
-          return;
+        // 2. Try IndexedDB second
+        let dbState: AppState | null = null;
+        try {
+          const { getAsset } = await import('./lib/idb');
+          const idbState = await getAsset('app_state_v2');
+          if (idbState && idbState.config && idbState.basicInfo) {
+            dbState = idbState;
+          }
+        } catch (err) {
+          console.warn("IndexedDB fallback load failed:", err);
         }
-      } catch (err) {
-        console.error("IndexedDB state loading failed: ", err);
-      }
 
-      // Keep initialized as true since it will use default/localStorage already initialized in useState
-      setIsInitialized(true);
+        // 3. Try LocalStorage third
+        let localState: AppState | null = null;
+        try {
+          const stored = localStorage.getItem(LOCAL_STORAGE_KEY);
+          if (stored) {
+            const parsed = JSON.parse(stored);
+            if (parsed && parsed.config && parsed.basicInfo) {
+              localState = parsed;
+            }
+          }
+        } catch (err) {
+          console.warn("LocalStorage fallback load failed:", err);
+        }
+
+        // 4. Compare timestamps and find the newest state
+        let selectedState: AppState = defaultData;
+        const candidates = [
+          { name: 'server', state: serverState, time: serverState?.updatedAt || 0 },
+          { name: 'indexedDB', state: dbState, time: dbState?.updatedAt || 0 },
+          { name: 'localStorage', state: localState, time: localState?.updatedAt || 0 },
+          { name: 'default', state: defaultData, time: defaultData.updatedAt || 1 } // slight bias for pristine defaults over empty non-timestamps
+        ];
+
+        candidates.sort((a, b) => b.time - a.time);
+
+        const bestCandidate = candidates.find(c => c.state !== null);
+        if (bestCandidate && bestCandidate.state) {
+          console.log(`Determined newest state from source [${bestCandidate.name}] (timestamp: ${bestCandidate.time})`);
+          selectedState = bestCandidate.state;
+        }
+
+        // Force-safety: If the chosen state doesn't have the full set of 13 research tasks, use defaults
+        if (!selectedState.researchTasks || selectedState.researchTasks.length < 13) {
+          console.log("Synchronous recovery: Restoring full 13 updated research tasks to state...");
+          selectedState = {
+            ...selectedState,
+            researchTasks: defaultData.researchTasks
+          };
+        }
+
+        setState(selectedState);
+        setIsInitialized(true);
+      } catch (err) {
+        console.error("Error running loadInitialState:", err);
+        setIsInitialized(true);
+      }
     }
 
     loadInitialState();
@@ -96,13 +137,18 @@ export default function App() {
   useEffect(() => {
     if (!isInitialized) return;
 
+    const stateToSave: AppState = {
+      ...state,
+      updatedAt: Date.now()
+    };
+
     // 1. Save to Server-side JSON database
     fetch('/api/state', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(state)
+      body: JSON.stringify(stateToSave)
     })
     .then(async (res) => {
       if (!res.ok) {
@@ -115,14 +161,14 @@ export default function App() {
 
     // 2. Save to IndexedDB (virtually unlimited quota for fallback browser session)
     import('./lib/idb').then(({ storeAsset }) => {
-      storeAsset('app_state_v2', state).catch((err) => {
+      storeAsset('app_state_v2', stateToSave).catch((err) => {
         console.error("IndexedDB state save failed: ", err);
       });
     });
 
     // 3. Fallback to localStorage (clean and graceful if quota exceeded)
     try {
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(state));
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(stateToSave));
     } catch (err) {
       console.warn("localStorage size quota exceeded, saved successfully to server and IndexedDB: ", err);
     }
@@ -313,6 +359,8 @@ export default function App() {
             state={state} 
             currentSubTab={currentSubTab} 
             onViewReport={(rep) => setActiveReportPdf(rep)} 
+            onUpdateState={handleUpdateState}
+            isAdminMode={isAdminMode}
           />
         )}
 

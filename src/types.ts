@@ -35,6 +35,13 @@ export interface ResearchTaskItem {
   resources: string[]; // 관련 자료
   resourceLinks?: string[]; // 관련 자료 링크 (1:1 매핑 또는 옵셔널)
   impact: string;      // 성과 및 변화
+  attachments?: Array<{
+    id: string;
+    name: string;
+    type: 'image' | 'pdf';
+    data: string; // Base64 raw representation
+    date: string;
+  }>;
 }
 
 export interface QuantitativeMetric {
@@ -171,4 +178,5 @@ export interface AppState {
   gallery: GalleryItem[];
   community: CommunityItem[];
   footer: FooterInfo;
+  updatedAt?: number;
 }
