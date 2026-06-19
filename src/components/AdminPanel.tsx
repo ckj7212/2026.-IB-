@@ -478,7 +478,8 @@ export default function AdminPanel({ state, onUpdateState, onClose, isAdminMode,
       cases: newTaskForm.cases || [],
       resources: newTaskForm.resources || [],
       resourceLinks: newTaskForm.resourceLinks || [],
-      impact: newTaskForm.impact || ''
+      impact: newTaskForm.impact || '',
+      attachments: newTaskForm.attachments || []
     };
 
     onUpdateState({
@@ -498,7 +499,8 @@ export default function AdminPanel({ state, onUpdateState, onClose, isAdminMode,
       cases: [],
       resources: [],
       resourceLinks: [],
-      impact: ''
+      impact: '',
+      attachments: []
     });
     setIsAddingNewTask(false);
     alert('새 연구과제가 성공적으로 추진 목록에 추가 편입되었습니다.');
@@ -2585,6 +2587,120 @@ export default function AdminPanel({ state, onUpdateState, onClose, isAdminMode,
                       </div>
                     </div>
 
+                    {/* 첨부파일 관리 (사례 이미지 및 학습 보고서/UOI 산출물 PDF) */}
+                    <div className="bg-neutral-50 p-4 rounded-xl border border-neutral-200 space-y-4">
+                      <div className="flex items-center justify-between">
+                        <strong className="text-xs font-bold text-neutral-800 block">
+                          📎 사례 첨부파일 및 산출물 관리 ({selectedTaskToEdit.attachments?.length || 0}개)
+                        </strong>
+                        <span className="text-[10px] text-neutral-400 font-mono">JPG, PNG, PDF 지원 | base64 DB 보완저장</span>
+                      </div>
+
+                      {/* 첨부파일 목록 */}
+                      {selectedTaskToEdit.attachments && selectedTaskToEdit.attachments.length > 0 ? (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
+                          {selectedTaskToEdit.attachments.map((att) => (
+                            <div key={att.id} className="flex items-center justify-between p-2.5 bg-white rounded-lg border border-neutral-200 shadow-3xs hover:border-blue-400 transition-all">
+                              <div className="flex items-center gap-2 min-w-0 pr-2">
+                                <span className="text-[9px] uppercase font-mono px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 font-black shrink-0">
+                                  {att.type === 'image' ? 'IMAGE' : 'PDF'}
+                                </span>
+                                <span className="text-xs text-neutral-800 font-bold truncate" title={att.name}>
+                                  {att.name}
+                                </span>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (confirm("이 첨부파일을 이 연구과제에서 영구히 삭제하시겠습니까? (최종편집 전)")) {
+                                    setSelectedTaskToEdit({
+                                      ...selectedTaskToEdit,
+                                      attachments: selectedTaskToEdit.attachments?.filter(a => a.id !== att.id) || []
+                                    });
+                                  }
+                                }}
+                                className="px-2 py-1 bg-red-50 hover:bg-red-100 text-red-600 rounded text-[11px] font-semibold transition-all cursor-pointer shrink-0"
+                              >
+                                삭제
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-neutral-450 text-xs italic text-center py-2 bg-white rounded-lg border border-neutral-100">
+                          등록된 실제 교육활동 사진 또는 첨부 산출물이 없습니다.
+                        </p>
+                      )}
+
+                      {/* 업로드 컨트롤 */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2.5 border-t border-neutral-200">
+                        <div>
+                          <label className="block text-[10.5px] text-neutral-600 font-bold mb-1">📷 실제 교육 사례 이미지 추가 (스냅샷, 현장 기록)</label>
+                          <input 
+                            type="file" 
+                            accept="image/*"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (!file) return;
+                              const reader = new FileReader();
+                              reader.onload = () => {
+                                const base64Data = reader.result as string;
+                                const newAttachments = [
+                                  ...(selectedTaskToEdit.attachments || []),
+                                  {
+                                    id: `att-${Date.now()}`,
+                                    name: file.name,
+                                    type: 'image' as const,
+                                    data: base64Data,
+                                    date: new Date().toISOString().split('T')[0]
+                                  }
+                                ];
+                                setSelectedTaskToEdit({
+                                  ...selectedTaskToEdit,
+                                  attachments: newAttachments
+                                });
+                                alert(`이미지 파일 "${file.name}"이 임시 첨부되었습니다. 하단의 [최종 편집내용 저장] 버튼을 누르면 DB에 영구 적용됩니다.`);
+                              };
+                              reader.readAsDataURL(file);
+                            }}
+                            className="block w-full text-xs text-neutral-500 file:mr-2 file:py-1 file:px-2.5 file:rounded file:border-0 file:text-[11px] file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10.5px] text-neutral-600 font-bold mb-1">📄 학습 보고서 / UOI 산출물 PDF 추가</label>
+                          <input 
+                            type="file" 
+                            accept="application/pdf"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (!file) return;
+                              const reader = new FileReader();
+                              reader.onload = () => {
+                                const base64Data = reader.result as string;
+                                const newAttachments = [
+                                  ...(selectedTaskToEdit.attachments || []),
+                                  {
+                                    id: `att-${Date.now()}`,
+                                    name: file.name,
+                                    type: 'pdf' as const,
+                                    data: base64Data,
+                                    date: new Date().toISOString().split('T')[0]
+                                  }
+                                ];
+                                setSelectedTaskToEdit({
+                                  ...selectedTaskToEdit,
+                                  attachments: newAttachments
+                                });
+                                alert(`PDF 문서 "${file.name}"이 임시 첨부되었습니다. 하단의 [최종 편집내용 저장] 버튼을 누르면 DB에 영구 적용됩니다.`);
+                              };
+                              reader.readAsDataURL(file);
+                            }}
+                            className="block w-full text-xs text-neutral-500 file:mr-2 file:py-1 file:px-2.5 file:rounded file:border-0 file:text-[11px] file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100 cursor-pointer"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
                     <div className="flex gap-2 justify-end pt-2 border-t border-neutral-150 text-xs">
                       <button
                         type="button"
@@ -2730,6 +2846,120 @@ export default function AdminPanel({ state, onUpdateState, onClose, isAdminMode,
                           className="w-full p-2 bg-neutral-50 border border-neutral-200 rounded-lg"
                           placeholder="위의 자료명 순서에 맞춰주세요"
                         />
+                      </div>
+                    </div>
+
+                    {/* 첨부파일 관리 (새 추진과제용) */}
+                    <div className="bg-neutral-50 p-4 rounded-xl border border-neutral-200 space-y-4">
+                      <div className="flex items-center justify-between">
+                        <strong className="text-xs font-bold text-neutral-800 block">
+                          📎 사례 첨부파일 및 산출물 관리 ({newTaskForm.attachments?.length || 0}개)
+                        </strong>
+                        <span className="text-[10px] text-neutral-400 font-mono">가독성 높은 JPG, PNG, PDF 지원</span>
+                      </div>
+
+                      {/* 첨부파일 목록 */}
+                      {newTaskForm.attachments && newTaskForm.attachments.length > 0 ? (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
+                          {newTaskForm.attachments.map((att) => (
+                            <div key={att.id} className="flex items-center justify-between p-2 pb-2 bg-white rounded-lg border border-neutral-200 shadow-3xs">
+                              <div className="flex items-center gap-2 min-w-0 pr-2">
+                                <span className="text-[9px] uppercase font-mono px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 font-black shrink-0">
+                                  {att.type === 'image' ? 'IMAGE' : 'PDF'}
+                                </span>
+                                <span className="text-xs text-neutral-800 font-bold truncate" title={att.name}>
+                                  {att.name}
+                                </span>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (confirm("이 첨부파일을 삭제하시겠습니까?")) {
+                                    setNewTaskForm({
+                                      ...newTaskForm,
+                                      attachments: newTaskForm.attachments?.filter(a => a.id !== att.id) || []
+                                    });
+                                  }
+                                }}
+                                className="px-2 py-1 bg-red-50 hover:bg-red-100 text-red-600 rounded text-[11px] font-semibold transition-all cursor-pointer shrink-0"
+                              >
+                                삭제
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-neutral-440 text-xs italic text-center py-2 bg-white rounded-lg border border-neutral-100">
+                          등록된 실제 교육활동 사진 또는 첨부 산출물이 없습니다.
+                        </p>
+                      )}
+
+                      {/* 업로드 컨트롤 */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-neutral-200">
+                        <div>
+                          <label className="block text-[10.5px] text-neutral-600 font-bold mb-1">📷 실제 교육 사례 이미지 추가</label>
+                          <input 
+                            type="file" 
+                            accept="image/*"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (!file) return;
+                              const reader = new FileReader();
+                              reader.onload = () => {
+                                const base64Data = reader.result as string;
+                                const newAttachments = [
+                                  ...(newTaskForm.attachments || []),
+                                  {
+                                    id: `att-${Date.now()}`,
+                                    name: file.name,
+                                    type: 'image' as const,
+                                    data: base64Data,
+                                    date: new Date().toISOString().split('T')[0]
+                                  }
+                                ];
+                                setNewTaskForm({
+                                  ...newTaskForm,
+                                  attachments: newAttachments
+                                });
+                                alert(`이미지 파일 "${file.name}"이 신설과제에 임시 첨부되었습니다.`);
+                              };
+                              reader.readAsDataURL(file);
+                            }}
+                            className="block w-full text-xs text-neutral-500 file:mr-2 file:py-1 file:px-2.5 file:rounded file:border-0 file:text-[11px] file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10.5px] text-neutral-600 font-bold mb-1">📄 학습 보고서 / UOI 산출물 PDF 추가</label>
+                          <input 
+                            type="file" 
+                            accept="application/pdf"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (!file) return;
+                              const reader = new FileReader();
+                              reader.onload = () => {
+                                const base64Data = reader.result as string;
+                                const newAttachments = [
+                                  ...(newTaskForm.attachments || []),
+                                  {
+                                    id: `att-${Date.now()}`,
+                                    name: file.name,
+                                    type: 'pdf' as const,
+                                    data: base64Data,
+                                    date: new Date().toISOString().split('T')[0]
+                                  }
+                                ];
+                                setNewTaskForm({
+                                  ...newTaskForm,
+                                  attachments: newAttachments
+                                });
+                                alert(`PDF 문서 "${file.name}"이 신설과제에 임시 첨부되었습니다.`);
+                              };
+                              reader.readAsDataURL(file);
+                            }}
+                            className="block w-full text-xs text-neutral-500 file:mr-2 file:py-1 file:px-2.5 file:rounded file:border-0 file:text-[11px] file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100 cursor-pointer"
+                          />
+                        </div>
                       </div>
                     </div>
 
