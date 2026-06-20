@@ -47,6 +47,21 @@ export default function App() {
   // Global notice bar
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
+  // Device-level liked post IDs tracking to allow toggle like and satisfy unique user like constraint
+  const [likedPostIds, setLikedPostIds] = useState<string[]>(() => {
+    try {
+      const stored = localStorage.getItem('bitgaram_liked_posts');
+      return stored ? JSON.parse(stored) : [];
+    } catch (err) {
+      return [];
+    }
+  });
+
+  // Keep liked post IDs updated in device storage
+  useEffect(() => {
+    localStorage.setItem('bitgaram_liked_posts', JSON.stringify(likedPostIds));
+  }, [likedPostIds]);
+
   // Sync admin state to localStorage
   useEffect(() => {
     localStorage.setItem('bitgaram_admin_active', isAdminMode ? 'true' : 'false');
@@ -96,30 +111,28 @@ export default function App() {
           console.warn("LocalStorage fallback load failed:", err);
         }
 
-        // 4. Determine state based on saved candidates or fallback to default
+        // 4. Fallback resolution: Shared database (Cloud Firestore / Server State) is the absolute SOURCE OF TRUTH
+        // to prevent stale local devices from overwriting server-wide contributions made by other users.
         let selectedState: AppState = defaultData;
         
-        const savedCandidates: { name: string; state: AppState; time: number }[] = [];
-        if (serverState) savedCandidates.push({ name: 'server', state: serverState, time: serverState.updatedAt || 0 });
-        if (dbState) savedCandidates.push({ name: 'indexedDB', state: dbState, time: dbState.updatedAt || 0 });
-        if (localState) savedCandidates.push({ name: 'localStorage', state: localState, time: localState.updatedAt || 0 });
-
-        if (savedCandidates.length > 0) {
-          // Sort descending by timestamp
-          savedCandidates.sort((a, b) => {
-            if (b.time !== a.time) {
-              return b.time - a.time;
-            }
-            // If timestamps match or are missing (0), use origin of truth preference order: server > indexedDB > localStorage
-            const priority: Record<string, number> = { server: 0, indexedDB: 1, localStorage: 2 };
-            return (priority[a.name] ?? 9) - (priority[b.name] ?? 9);
-          });
-
-          selectedState = savedCandidates[0].state;
-          console.log(`Determined newest state from source [${savedCandidates[0].name}] (timestamp: ${savedCandidates[0].time})`);
+        if (serverState) {
+          console.log("Resolved state from central shared Cloud Firestore datastore.");
+          selectedState = serverState;
         } else {
-          console.log("No saved state found. Initializing with pristine default data.");
-          selectedState = defaultData;
+          console.log("Server unreachable. Resolving fallback from local device cache...");
+          const savedCandidates: { name: string; state: AppState; time: number }[] = [];
+          if (dbState) savedCandidates.push({ name: 'indexedDB', state: dbState, time: dbState.updatedAt || 0 });
+          if (localState) savedCandidates.push({ name: 'localStorage', state: localState, time: localState.updatedAt || 0 });
+
+          if (savedCandidates.length > 0) {
+            // Sort descending by timestamp
+            savedCandidates.sort((a, b) => b.time - a.time);
+            selectedState = savedCandidates[0].state;
+            console.log(`Determined newest fallback state from source [${savedCandidates[0].name}] (timestamp: ${savedCandidates[0].time})`);
+          } else {
+            console.log("No saved state found. Initializing with pristine default data.");
+            selectedState = defaultData;
+          }
         }
 
         // Force-safety: Only restore defaults if the list is completely missing, 
@@ -266,14 +279,25 @@ export default function App() {
   };
 
   const handleLikePost = (postId: string) => {
+    const alreadyLiked = likedPostIds.includes(postId);
     const updatedCommunity = state.community.map(post => {
       if (post.id === postId) {
-        return { ...post, likes: post.likes + 1 };
+        const currentLikes = post.likes || 0;
+        const newLikes = alreadyLiked ? Math.max(0, currentLikes - 1) : currentLikes + 1;
+        return { ...post, likes: newLikes };
       }
       return post;
     });
-    setState(prev => ({ ...prev, community: updatedCommunity }));
-    triggerToast('배움에 대해 깊은 공감을 전달했습니다.');
+
+    if (alreadyLiked) {
+      setLikedPostIds(prev => prev.filter(id => id !== postId));
+      setState(prev => ({ ...prev, community: updatedCommunity }));
+      triggerToast('공감을 취소했습니다. ❤️');
+    } else {
+      setLikedPostIds(prev => [...prev, postId]);
+      setState(prev => ({ ...prev, community: updatedCommunity }));
+      triggerToast('배움에 대해 깊은 공감을 전달했습니다. ❤️');
+    }
   };
 
   const handleDeletePost = (postId: string) => {
