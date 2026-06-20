@@ -133,7 +133,7 @@ export default function HomeSection({ state, currentSubTab }: HomeSectionProps) 
                   2026 전라남도교육청 지정
                 </span>
                 <h2 className="text-2xl sm:text-3xl font-black text-neutral-900 tracking-tight mt-2">
-                  IB PYP 연구학교
+                  IB 월드스쿨(초) 연구학교
                 </h2>
               </div>
 
@@ -156,7 +156,7 @@ export default function HomeSection({ state, currentSubTab }: HomeSectionProps) 
             </div>
 
             <div className="pt-4 border-t border-neutral-100 flex items-center justify-between text-xs text-neutral-400">
-              <span className="font-medium text-blue-600/70">* IB PYP 후보학교</span>
+              <span className="font-medium text-blue-600/70">* IB PYP 월드스쿨</span>
               <span className="font-mono font-semibold text-neutral-500">빛가람초등학교</span>
             </div>
           </div>
