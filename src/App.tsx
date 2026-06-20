@@ -74,7 +74,13 @@ export default function App() {
         // 1. Try server-side persistence
         let serverState: AppState | null = null;
         try {
-          const apiResponse = await fetch('/api/state');
+          // Add cache bust timestamp parameter to bypass aggressive smartphone / Safari disk caching
+          const apiResponse = await fetch(`/api/state?_t=${Date.now()}`, {
+            headers: {
+              'Cache-Control': 'no-cache',
+              'Pragma': 'no-cache'
+            }
+          });
           if (apiResponse.ok) {
             const apiState = await apiResponse.json();
             if (apiState && apiState.config && apiState.basicInfo) {

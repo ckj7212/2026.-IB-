@@ -17,6 +17,11 @@ async function startServer() {
 
   // API endpoint to retrieve the currently persisted server state
   app.get("/api/state", async (req, res) => {
+    // Prevent mobile browsers (iOS/Android/Safari/Chrome) from aggressively caching state GET requests
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+    res.setHeader("Pragma", "no-cache");
+    res.setHeader("Expires", "0");
+
     try {
       // 1. Try reading from Firestore first
       const firestoreState = await getPortalStateFromFirestore();

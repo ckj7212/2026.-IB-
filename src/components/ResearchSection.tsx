@@ -71,6 +71,25 @@ export default function ResearchSection({
     };
   }, [selectedTask]);
 
+  const handleOpenPdf = (att: any) => {
+    const url = pdfBlobUrls[att.id] || att.data;
+    if (url) {
+      window.open(url, '_blank');
+    }
+  };
+
+  const handleDownloadPdf = (att: any) => {
+    const url = pdfBlobUrls[att.id] || att.data;
+    if (url) {
+      const element = document.createElement("a");
+      element.href = url;
+      element.download = att.name || 'download.pdf';
+      document.body.appendChild(element);
+      element.click();
+      document.body.removeChild(element);
+    }
+  };
+
   const getStepStyles = (index: number) => {
     const styles = [
       {
@@ -700,11 +719,34 @@ export default function ResearchSection({
                                   className="w-full h-full object-contain hover:scale-[1.03] transition-transform duration-300 pointer-events-none"
                                 />
                               ) : (
-                                <iframe
-                                  src={pdfBlobUrls[currentAtt.id] || currentAtt.data}
-                                  className="w-full h-full bg-white border-0"
-                                  title={currentAtt.name}
-                                />
+                                <div className="w-full h-full bg-neutral-900 flex flex-col justify-between p-4 text-white">
+                                  <div className="flex-1 flex flex-col items-center justify-center text-center space-y-3">
+                                    <div className="w-12 h-12 rounded-full bg-red-600 flex items-center justify-center text-white shadow-md font-black text-sm select-none">
+                                      PDF
+                                    </div>
+                                    <div className="space-y-1 px-4">
+                                      <p className="text-xs font-bold text-neutral-100 line-clamp-2 leading-snug">{currentAtt.name}</p>
+                                      <p className="text-[10px] text-neutral-400 font-mono">연구 및 탐구 수업 성찰 산출물</p>
+                                    </div>
+                                  </div>
+                                  <div className="flex gap-2 mt-auto shrink-0 z-10">
+                                    <button
+                                      type="button"
+                                      onClick={() => setViewingAttachment(currentAtt)}
+                                      className="flex-1 py-1.5 px-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-[10.5px] rounded-lg transition-all cursor-pointer active:scale-95"
+                                    >
+                                      🔍 크게보기
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleOpenPdf(currentAtt)}
+                                      className="py-1.5 px-2.5 bg-neutral-800 hover:bg-neutral-750 text-neutral-300 font-bold text-[10.5px] rounded-lg transition-all cursor-pointer active:scale-95"
+                                      title="새 창으로 문서 바로 열기"
+                                    >
+                                      🚀 바로보기
+                                    </button>
+                                  </div>
+                                </div>
                               )}
  
                               {/* Slider Prev / Next buttons over slide */}
@@ -852,12 +894,42 @@ export default function ResearchSection({
                       className="max-w-full max-h-[60vh] object-contain rounded-lg shadow-sm border border-neutral-200"
                     />
                   ) : (
-                    <div className="w-full h-[70vh] bg-white rounded-xl overflow-hidden border border-neutral-200 shadow-md">
-                      <iframe
-                        src={pdfBlobUrls[viewingAttachment.id] || viewingAttachment.data}
-                        className="w-full h-full bg-neutral-950 border-0"
-                        title={viewingAttachment.name}
-                      />
+                    <div className="w-full flex flex-col gap-4">
+                      {/* Responsive Action Header for Smartphone Compatibility */}
+                      <div className="bg-blue-50 border border-blue-200 p-4 rounded-xl flex flex-col sm:flex-row justify-between items-center gap-3">
+                        <div className="text-center sm:text-left">
+                          <p className="text-xs font-bold text-blue-900 flex items-center justify-center sm:justify-start gap-1">
+                            <span>📱 스마트폰 및 타기기 호환 뷰어 안내</span>
+                          </p>
+                          <p className="text-[11px] text-neutral-600 mt-0.5 leading-relaxed">
+                            모바일(iOS/안드로이드) 또는 사파리 등 일부 브라우저에서 인라인 PDF가 보이지 않을 경우 새 창 열기나 다운로드 버튼을 눌러 바로 확인 가능합니다.
+                          </p>
+                        </div>
+                        <div className="flex gap-2 w-full sm:w-auto shrink-0 justify-center">
+                          <button
+                            type="button"
+                            onClick={() => handleOpenPdf(viewingAttachment)}
+                            className="flex-1 sm:flex-initial px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-lg shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
+                          >
+                            🚀 새 창으로 열기
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDownloadPdf(viewingAttachment)}
+                            className="flex-1 sm:flex-initial px-4 py-2 bg-emerald-605 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
+                          >
+                            ⬇️ 다운로드
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="w-full h-[60vh] bg-white rounded-xl overflow-hidden border border-neutral-200 shadow-md">
+                        <iframe
+                          src={pdfBlobUrls[viewingAttachment.id] || viewingAttachment.data}
+                          className="w-full h-full bg-neutral-950 border-0"
+                          title={viewingAttachment.name}
+                        />
+                      </div>
                     </div>
                   )}
                 </div>

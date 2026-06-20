@@ -129,6 +129,34 @@ export default function PdfViewerModal({ report, onClose }: PdfViewerModalProps)
           {report.pdfBase64 ? (
             <div className="w-full h-full flex flex-col gap-4 font-sans justify-between">
               
+              {/* Responsive Action Header for Smartphone & Safari Compatibility */}
+              <div className="bg-neutral-900 border border-neutral-800 p-4 rounded-xl flex flex-col sm:flex-row justify-between items-center gap-3">
+                <div className="text-center sm:text-left">
+                  <p className="text-xs font-bold text-blue-400 flex items-center justify-center sm:justify-start gap-1">
+                    <span>📱 스마트폰 및 타기기 호환 뷰어 안내</span>
+                  </p>
+                  <p className="text-[11px] text-neutral-400 mt-0.5 leading-relaxed">
+                    모바일 기기(아이폰/안드로이드)나 사파리 환경에서 인라인 PDF가 표시되지 않을 경우 아래 버튼들을 눌러 바로 열어볼 수 있습니다.
+                  </p>
+                </div>
+                <div className="flex gap-2 w-full sm:w-auto shrink-0 justify-center">
+                  <button
+                    type="button"
+                    onClick={handleOpenPDFInNewTab}
+                    className="flex-1 sm:flex-initial px-4 py-2 bg-blue-600 hover:bg-blue-750 text-white font-bold text-xs rounded-lg shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
+                  >
+                    🚀 새 창으로 열기
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleDownload}
+                    className="flex-1 sm:flex-initial px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
+                  >
+                    ⬇️ 다운로드
+                  </button>
+                </div>
+              </div>
+
               {/* Keeps the iframe preview full-size taking the entire viewport */}
               <div className="w-full h-full min-h-[500px] bg-neutral-900 rounded-lg overflow-hidden border border-neutral-800 shadow-inner relative flex-1">
                 <iframe
