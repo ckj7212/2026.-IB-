@@ -129,40 +129,8 @@ export default function PdfViewerModal({ report, onClose }: PdfViewerModalProps)
           {report.pdfBase64 ? (
             <div className="w-full h-full flex flex-col gap-4 font-sans justify-between">
               
-              {/* Sandbox Workaround Friendly Access Card */}
-              <div className="bg-neutral-900 border border-neutral-800 p-5 rounded-xl text-center space-y-3 w-full max-w-2xl mx-auto shadow-xl">
-                <div className="space-y-1">
-                  <h4 className="text-sm font-extrabold text-white flex items-center justify-center gap-2">
-                    <span className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-pulse"></span>
-                    💡 크롬(Chrome) 및 모바일 임베드 차단 해결 패널
-                  </h4>
-                  <p className="text-[11.5px] text-neutral-400 leading-relaxed">
-                    구글 크롬 등의 브라우저에서 <span className="text-rose-400">"크롬에서 지원하지 않는 형식"</span>이나 빈 화면이 표시될 수 있습니다. 
-                    이는 현재 미리보기 창의 보안 모래상자(Sandbox) 규제로 인한 현상입니다. 
-                    아래 버튼을 통해 해결할 수 있습니다.
-                  </p>
-                </div>
-                
-                <div className="flex flex-col sm:flex-row gap-3 justify-center pt-1.5 font-sans">
-                  <button
-                    type="button"
-                    onClick={handleOpenPDFInNewTab}
-                    className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-extrabold rounded-lg text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow hover:scale-[1.01]"
-                  >
-                    🖥️ 새 창에서 PDF 원본 전체화면 열기
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleDownload}
-                    className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-lg text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow hover:scale-[1.01]"
-                  >
-                    📁 원본 다운로드 저장
-                  </button>
-                </div>
-              </div>
-
-              {/* Keeps the iframe preview under the quick button */}
-              <div className="flex-1 min-h-[380px] bg-neutral-900 rounded-lg overflow-hidden border border-neutral-800 shadow-inner relative">
+              {/* Keeps the iframe preview full-size taking the entire viewport */}
+              <div className="w-full h-full min-h-[500px] bg-neutral-900 rounded-lg overflow-hidden border border-neutral-800 shadow-inner relative flex-1">
                 <iframe
                   src={blobUrl || report.pdfBase64}
                   className="w-full h-full bg-neutral-950 border-0"
