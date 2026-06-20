@@ -22,6 +22,11 @@ export default function ResearchSection({
   const [viewingAttachment, setViewingAttachment] = useState<any>(null);
   const [activeThemeTab, setActiveThemeTab] = useState<number>(1);
   const [activeOutcomeTab, setActiveOutcomeTab] = useState<'quantitative' | 'qualitative'>('quantitative');
+  const [activeAttachmentIndex, setActiveAttachmentIndex] = useState<number>(0);
+
+  React.useEffect(() => {
+    setActiveAttachmentIndex(0);
+  }, [selectedTask?.id]);
 
   const getStepStyles = (index: number) => {
     const styles = [
@@ -31,7 +36,7 @@ export default function ResearchSection({
         badgeText: 'text-blue-50',
         iconBg: 'bg-blue-50 text-blue-600',
         accentColor: 'text-blue-600',
-        icon: <Layers className="w-5 h-5" />
+        icon: <Layers className="w-5 h-5 animate-pulse-slow" />
       },
       {
         border: 'border-neutral-200/95 hover:border-emerald-400 border-t-4 border-t-emerald-600',
@@ -53,27 +58,41 @@ export default function ResearchSection({
     return styles[index % styles.length];
   };
 
-  const handleAddAttachment = (e: React.ChangeEvent<HTMLInputElement>, fileType: 'image' | 'pdf') => {
-    const file = e.target.files?.[0];
-    if (!file || !selectedTask || !onUpdateState) return;
+  const handleAddAttachment = async (e: React.ChangeEvent<HTMLInputElement>, fileType: 'image' | 'pdf') => {
+    const files = e.target.files;
+    if (!files || files.length === 0 || !selectedTask || !onUpdateState) return;
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      const base64Data = reader.result as string;
-      const newAttachment = {
-        id: `att-${Date.now()}`,
-        name: file.name,
-        type: fileType,
-        data: base64Data,
-        date: new Date().toISOString().split('T')[0]
-      };
+    const fileList = Array.from(files) as File[];
+    const readFilesPromises = fileList.map((file, index) => {
+      return new Promise<{ id: string; name: string; type: 'image' | 'pdf'; data: string; date: string }>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          if (typeof reader.result === 'string') {
+            resolve({
+              id: `att-${Date.now()}-${index}-${Math.random().toString(36).substring(2, 7)}`,
+              name: file.name,
+              type: fileType,
+              data: reader.result,
+              date: new Date().toISOString().split('T')[0]
+            });
+          } else {
+            reject(new Error('Failed to read file ' + file.name));
+          }
+        };
+        reader.onerror = () => reject(reader.error || new Error('Error reading ' + file.name));
+        reader.readAsDataURL(file);
+      });
+    });
 
+    try {
+      const newAttachments = await Promise.all(readFilesPromises);
+      
       const updatedTasks = researchTasks.map(t => {
         if (t.id === selectedTask.id) {
           const currentAttachments = t.attachments || [];
           return {
             ...t,
-            attachments: [...currentAttachments, newAttachment]
+            attachments: [...currentAttachments, ...newAttachments]
           };
         }
         return t;
@@ -87,8 +106,12 @@ export default function ResearchSection({
       onUpdateState(updatedState);
       const updatedTask = updatedTasks.find(t => t.id === selectedTask.id);
       if (updatedTask) setSelectedTask(updatedTask);
-    };
-    reader.readAsDataURL(file);
+      
+      alert(`성공적으로 ${newAttachments.length}개의 파일이 첨부되었습니다.`);
+    } catch (err) {
+      console.error(err);
+      alert('파일 업로드 중 오류가 발생했습니다.');
+    }
   };
 
   const handleDeleteAttachment = (attachmentId: string) => {
@@ -416,138 +439,141 @@ export default function ResearchSection({
           {/* Research Task Detail Modal */}
           {selectedTask && (
             <div id="task-modal-overlay" className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fade-in">
-              <div id="task-modal-container" className="bg-white rounded-2xl w-full max-w-2xl max-h-[85vh] overflow-y-auto shadow-2xl border border-neutral-200 flex flex-col">
-                <div className="p-5 border-b border-neutral-100 bg-neutral-50 flex justify-between items-center">
+              <div id="task-modal-container" className="bg-white rounded-2xl w-full max-w-6xl h-[90vh] md:h-[85vh] overflow-hidden shadow-2xl border border-neutral-200 flex flex-col">
+                <div className="p-5 border-b border-neutral-100 bg-neutral-50 flex justify-between items-center shrink-0">
                   <div className="flex items-center gap-2">
                     <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 font-bold uppercase font-mono">
                       Research Task Details
                     </span>
                     <span className="text-neutral-300">|</span>
-                    <span className="text-xs text-neutral-600 font-extrabold">세부내용 확인</span>
+                    <span className="text-xs text-neutral-600 font-extrabold pb-0.5">상세 추진 사례 및 산출물 연계</span>
                   </div>
                   <button 
                     onClick={() => setSelectedTask(null)}
-                    className="p-1 px-2.5 bg-neutral-200 hover:bg-neutral-300 text-neutral-700 hover:text-neutral-900 rounded-lg text-xs font-bold transition-allcursor-pointer"
+                    className="p-1 px-2.5 bg-neutral-200 hover:bg-neutral-300 text-neutral-700 hover:text-neutral-900 rounded-lg text-xs font-bold transition-all cursor-pointer"
                   >
                     닫기
                   </button>
                 </div>
  
-                <div className="p-6 overflow-y-auto space-y-5 font-sans">
-                  <div>
-                    <h3 className="text-base sm:text-lg font-extrabold text-neutral-950 tracking-tight leading-snug">
-                      [{selectedTask.taskCode}] {selectedTask.title}
-                    </h3>
-                  </div>
- 
-                  <div className="space-y-4 text-xs sm:text-sm">
-                    {/* Unified 1-4 Cards styling with identical border, padding, theme tone and font sizes */}
-                    <div className="bg-blue-50/10 p-4 rounded-xl border border-neutral-200">
-                      <strong className="text-blue-900 block mb-1.5 font-bold text-xs sm:text-sm flex items-center gap-1.5">
-                        🔍 1. 추진 배경 (Background)
-                      </strong>
-                      <p className="text-neutral-700 leading-relaxed text-justify">{selectedTask.bg}</p>
+                {/* Horizontal Split Body */}
+                <div className="flex-1 overflow-hidden grid grid-cols-1 md:grid-cols-12 min-h-0 divide-y md:divide-y-0 md:divide-x divide-neutral-200">
+                  
+                  {/* Left Column (7 of 12) - Research Case Details & Admin Upload */}
+                  <div className="md:col-span-7 p-6 overflow-y-auto space-y-5 min-h-0 scrollbar-thin">
+                    <div>
+                      <h3 className="text-base sm:text-lg font-extrabold text-neutral-950 tracking-tight leading-snug">
+                        [{selectedTask.taskCode}] {selectedTask.title}
+                      </h3>
                     </div>
  
-                    <div className="bg-blue-50/10 p-4 rounded-xl border border-neutral-200">
-                      <strong className="text-blue-900 block mb-1.5 font-bold text-xs sm:text-sm flex items-center gap-1.5">
-                        🛠️ 2. 핵심 실행 구조 (Actions)
-                      </strong>
-                      <p className="text-neutral-700 leading-relaxed text-justify">{selectedTask.text}</p>
-                    </div>
- 
-                    <div className="bg-blue-50/10 p-4 rounded-xl border border-neutral-200 animate-slide-in">
-                      <strong className="text-blue-900 block mb-1.5 font-bold text-xs sm:text-sm flex items-center gap-1.5 animate-pulse-slow">
-                        📋 3. 구체적 운영 방법 (Methodology)
-                      </strong>
-                      <ul className="list-disc pl-5 text-xs text-neutral-700 space-y-1">
-                        {selectedTask.methods?.map((m, idx) => (
-                          <li key={idx} className="leading-relaxed text-justify">{m}</li>
-                        ))}
-                      </ul>
-                    </div>
- 
-                    <div className="bg-blue-50/10 p-4 rounded-xl border border-neutral-200">
-                      <strong className="text-blue-900 block mb-1.5 font-bold text-xs sm:text-sm flex items-center gap-1.5">
-                        💡 4. 실제 학교 적용사례 (Classroom Practice Case)
-                      </strong>
-                      <ul className="list-disc pl-5 text-xs text-neutral-700 space-y-1">
-                        {selectedTask.cases?.map((c, idx) => (
-                          <li key={idx} className="leading-relaxed text-justify">{c}</li>
-                        ))}
-                      </ul>
-                    </div>
- 
-                    {/* Dynamic Case Attachment List & Upload Engine */}
-                    <div className="bg-neutral-50 p-4 rounded-xl border border-neutral-200 space-y-4">
-                      <div className="flex items-center justify-between">
-                        <strong className="text-xs font-bold text-neutral-800 block">
-                          📎 사례 첨부파일 및 산출물 예람 ({selectedTask.attachments?.length || 0}개)
+                    <div className="space-y-4 text-xs sm:text-sm">
+                      {/* 1. 추진 배경 (Background) */}
+                      <div className="bg-blue-50/10 p-4 rounded-xl border border-neutral-200">
+                        <strong className="text-blue-900 block mb-1.5 font-bold text-xs sm:text-sm flex items-center gap-1.5">
+                          🔍 1. 추진 배경 (Background)
                         </strong>
-                        <span className="text-[10px] text-neutral-400 font-mono">JPG, PNG, PDF 지원</span>
+                        <p className="text-neutral-700 leading-relaxed text-justify">{selectedTask.bg}</p>
                       </div>
-
-                      {/* Display individual attachments */}
-                      {selectedTask.attachments && selectedTask.attachments.length > 0 ? (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
-                          {selectedTask.attachments.map((att) => (
-                            <div key={att.id} className="flex items-center justify-between p-2.5 bg-white rounded-lg border border-neutral-200 shadow-3xs hover:border-blue-400 transition-colors">
-                              <div className="flex items-center gap-2 min-w-0 pr-2">
-                                <span className="text-[9px] uppercase font-mono px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 font-black shrink-0">
-                                  {att.type === 'image' ? 'IMAGE' : 'PDF'}
-                                </span>
-                                <span className="text-xs text-neutral-800 font-semibold truncate" title={att.name}>
-                                  {att.name}
-                                </span>
-                              </div>
-                              <div className="flex items-center gap-1 shrink-0">
-                                <button
-                                  onClick={() => setViewingAttachment(att)}
-                                  className="px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-[11px] font-bold transition-all cursor-pointer"
-                                >
-                                  보기
-                                </button>
-                                {isAdminMode && (
-                                  <button
-                                    onClick={() => handleDeleteAttachment(att.id)}
-                                    className="px-2 py-1 bg-red-50 hover:bg-red-100 text-red-600 rounded text-[11px] font-semibold transition-all cursor-pointer"
-                                    title="첨부파일 삭제"
-                                  >
-                                    삭제
-                                  </button>
-                                )}
-                              </div>
-                            </div>
+ 
+                      {/* 2. 핵심 실행 구조 (Actions) */}
+                      <div className="bg-blue-50/10 p-4 rounded-xl border border-neutral-200">
+                        <strong className="text-blue-900 block mb-1.5 font-bold text-xs sm:text-sm flex items-center gap-1.5">
+                          🛠️ 2. 핵심 실행 구조 (Actions)
+                        </strong>
+                        <p className="text-neutral-700 leading-relaxed text-justify">{selectedTask.text}</p>
+                      </div>
+ 
+                      {/* 3. 구체적 운영 방법 (Methodology) */}
+                      <div className="bg-blue-50/10 p-4 rounded-xl border border-neutral-200">
+                        <strong className="text-blue-900 block mb-1.5 font-bold text-xs sm:text-sm flex items-center gap-1.5 font-sans">
+                          📋 3. 구체적 운영 방법 (Methodology)
+                        </strong>
+                        <ul className="list-disc pl-5 text-xs text-neutral-700 space-y-1">
+                          {selectedTask.methods?.map((m, idx) => (
+                            <li key={idx} className="leading-relaxed text-justify">{m}</li>
                           ))}
+                        </ul>
+                      </div>
+ 
+                      {/* 4. 실제 학교 적용사례 (Classroom Practice Case) */}
+                      <div className="bg-blue-50/10 p-4 rounded-xl border border-neutral-200">
+                        <strong className="text-blue-900 block mb-1.5 font-bold text-xs sm:text-sm flex items-center gap-1.5">
+                          💡 4. 실제 학교 적용사례 (Classroom Practice Case)
+                        </strong>
+                        <ul className="list-disc pl-5 text-xs text-neutral-700 space-y-1">
+                          {selectedTask.cases?.map((c, idx) => (
+                            <li key={idx} className="leading-relaxed text-justify">{c}</li>
+                          ))}
+                        </ul>
+                      </div>
+ 
+                      {/* Interactive Media Index List */}
+                      <div className="bg-neutral-50 p-4 rounded-xl border border-neutral-200 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <strong className="text-xs font-bold text-neutral-850 block">
+                            📎 실시간 첨부 및 산출물 색인 ({selectedTask.attachments?.length || 0}개)
+                          </strong>
+                          <span className="text-[10px] text-neutral-400 font-mono">가로 슬라이더와 자동 유관 동기화</span>
                         </div>
-                      ) : (
-                        <div className="text-center py-4 bg-white rounded-lg border border-neutral-100">
-                          <p className="text-neutral-400 text-xs italic">등록된 실제 교육활동 사진 또는 첨부 산출물이 없습니다.</p>
-                          {isAdminMode && <p className="text-[10.5px] text-blue-600 font-semibold mt-1">관리자 기능: 하단 업로드 도구를 사용해 학급 활동 사례를 등록하세요.</p>}
-                        </div>
-                      )}
-
-                      {/* Admin upload capabilities */}
+ 
+                        {selectedTask.attachments && selectedTask.attachments.length > 0 ? (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
+                            {selectedTask.attachments.map((att, idx) => (
+                              <button
+                                key={att.id}
+                                type="button"
+                                onClick={() => setActiveAttachmentIndex(idx)}
+                                className={`flex items-center justify-between p-2 text-left rounded-lg border transition-all cursor-pointer ${
+                                  activeAttachmentIndex === idx
+                                    ? 'bg-blue-50 border-blue-500 text-blue-900 font-extrabold shadow-3xs'
+                                    : 'bg-white border-neutral-200 hover:border-neutral-350 text-neutral-700'
+                                }`}
+                              >
+                                <div className="flex items-center gap-1.5 min-w-0 pr-2">
+                                  <span className={`text-[8px] uppercase font-mono px-1 py-0.5 rounded shrink-0 font-extrabold ${
+                                    att.type === 'image' ? 'bg-blue-100 text-blue-750' : 'bg-red-100 text-red-750'
+                                  }`}>
+                                    {att.type === 'image' ? 'IMG' : 'PDF'}
+                                  </span>
+                                  <span className="text-xs font-semibold truncate" title={att.name}>
+                                    {idx + 1}. {att.name}
+                                  </span>
+                                </div>
+                                <span className="text-[10px] text-blue-600 shrink-0 font-bold select-none hover:underline">보기</span>
+                              </button>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="text-center py-3 bg-white rounded-lg border border-neutral-100">
+                            <p className="text-neutral-400 text-xs italic">업로드된 실제 교육활동 사진 또는 산출물 데이터가 존재하지 않습니다.</p>
+                          </div>
+                        )}
+                      </div>
+ 
+                      {/* Admin upload capabilities (Supports Bulk Selection) */}
                       {isAdminMode && (
-                        <div className="bg-white p-3 rounded-xl border border-dashed border-blue-200 space-y-2 mt-4">
-                          <span className="text-xs font-bold text-blue-800 flex items-center gap-1">
-                            <Sparkles className="w-3.5 h-3.5" /> [관리자 전용] 현장 기록 및 산출물 파일 업로드
+                        <div className="bg-white p-4 rounded-xl border border-dashed border-blue-250 space-y-3">
+                          <span className="text-xs font-black text-blue-800 flex items-center gap-1">
+                            <Sparkles className="w-3.5 h-3.5" /> [관리자 기능] 사진 및 산출물 대량 동시 업로드
                           </span>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
-                              <span className="block text-[10.5px] text-neutral-500 font-bold mb-1">📷 이미지 사례 추가 (Wonder Wall, 학급 기록 등)</span>
+                              <span className="block text-[10.5px] text-neutral-600 font-bold mb-1">📷 이미지 일괄 추가 (여러장 선택 가능)</span>
                               <input 
                                 type="file" 
                                 accept="image/*"
+                                multiple
                                 onChange={(e) => handleAddAttachment(e, 'image')}
                                 className="block w-full text-xs text-neutral-500 file:mr-2 file:py-1 file:px-2.5 file:rounded file:border-0 file:text-[11px] file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
                               />
                             </div>
                             <div>
-                              <span className="block text-[10.5px] text-neutral-500 font-bold mb-1">📄 학습 보고서/UOI 산출물 PDF 추가</span>
+                              <span className="block text-[10.5px] text-neutral-600 font-bold mb-1">📄 학습 보고서/UOI 산출물 PDF 추가 (여러장 선택 가능)</span>
                               <input 
                                 type="file" 
                                 accept="application/pdf"
+                                multiple
                                 onChange={(e) => handleAddAttachment(e, 'pdf')}
                                 className="block w-full text-xs text-neutral-500 file:mr-2 file:py-1 file:px-2.5 file:rounded file:border-0 file:text-[11px] file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100 cursor-pointer"
                               />
@@ -555,53 +581,218 @@ export default function ResearchSection({
                           </div>
                         </div>
                       )}
-                    </div>
  
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
-                      <div className="bg-neutral-50 p-3.5 rounded-lg border border-neutral-200/60 flex flex-col justify-between">
-                        <div>
-                          <strong className="text-[11.5px] uppercase tracking-wider text-neutral-600 font-mono block">📦 연구 산출물 관련 리포트 바로가기</strong>
-                          <ul className="text-xs mt-1.5 space-y-1">
-                            {selectedTask.resources?.map((r, idx) => {
-                              const link = selectedTask.resourceLinks?.[idx];
-                              if (link && link.trim().startsWith('http')) {
+                      {/* Resources and Impacts */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                        <div className="bg-neutral-50 p-3.5 rounded-lg border border-neutral-200/60 flex flex-col justify-between">
+                          <div>
+                            <strong className="text-[11.5px] uppercase tracking-wider text-neutral-600 font-mono block">📦 연구 산출물 관련 리포트 바로가기</strong>
+                            <ul className="text-xs mt-1.5 space-y-1">
+                              {selectedTask.resources?.map((r, idx) => {
+                                const link = selectedTask.resourceLinks?.[idx];
+                                if (link && link.trim().startsWith('http')) {
+                                  return (
+                                    <li key={idx} className="truncate">
+                                      <a 
+                                        href={link} 
+                                        target="_blank" 
+                                        rel="noopener noreferrer" 
+                                        className="text-blue-600 hover:text-blue-800 hover:underline font-bold inline-flex items-center gap-1 cursor-pointer"
+                                        title={`${r} 산출물 링크 열기`}
+                                      >
+                                        📎 {r} <ArrowUpRight className="w-3.5 h-3.5 text-blue-500 inline shrink-0" />
+                                      </a>
+                                    </li>
+                                  );
+                                }
                                 return (
-                                  <li key={idx} className="truncate">
-                                    <a 
-                                      href={link} 
-                                      target="_blank" 
-                                      rel="noopener noreferrer" 
-                                      className="text-blue-600 hover:text-blue-800 hover:underline font-bold inline-flex items-center gap-1 cursor-pointer"
-                                      title={`${r} 산출물 링크 열기`}
-                                    >
-                                      📎 {r} <ArrowUpRight className="w-3.5 h-3.5 text-blue-500 inline shrink-0" />
-                                    </a>
+                                  <li key={idx} className="truncate text-neutral-700">
+                                    📎 {r}
                                   </li>
                                 );
-                              }
-                              return (
-                                <li key={idx} className="truncate text-neutral-700">
-                                  📎 {r}
-                                </li>
-                              );
-                            })}
-                            {(!selectedTask.resources || selectedTask.resources.length === 0) && (
-                              <li className="text-[11px] text-neutral-400">등록된 산출물 목록이 없습니다.</li>
-                            )}
-                          </ul>
+                              })}
+                              {(!selectedTask.resources || selectedTask.resources.length === 0) && (
+                                <li className="text-[11px] text-neutral-400">등록된 산출물 목록이 없습니다.</li>
+                              )}
+                            </ul>
+                          </div>
                         </div>
-                      </div>
-                      <div className="bg-blue-50/30 p-3.5 rounded-lg border border-blue-105">
-                        <strong className="text-[11.5px] uppercase tracking-wider text-blue-700 font-mono block">📈 도출 성과 및 본교 실질 변화</strong>
-                        <p className="text-xs text-neutral-700 mt-1.5 leading-relaxed text-justify">
-                          {selectedTask.impact}
-                        </p>
+                        <div className="bg-blue-50/30 p-3.5 rounded-lg border border-blue-105">
+                          <strong className="text-[11.5px] uppercase tracking-wider text-blue-700 font-mono block">📈 도출 성과 및 본교 실질 변화</strong>
+                          <p className="text-xs text-neutral-700 mt-1.5 leading-relaxed text-justify">
+                            {selectedTask.impact}
+                          </p>
+                        </div>
                       </div>
                     </div>
                   </div>
+ 
+                  {/* Right Column (5 of 12) - Continuous Live Viewer Slideshow */}
+                  <div className="md:col-span-5 p-6 bg-neutral-50 overflow-y-auto flex flex-col justify-start min-h-0 scrollbar-thin space-y-4">
+                    <div className="border-b border-neutral-200 pb-2 mb-1 flex items-center justify-between">
+                      <span className="text-xs font-black text-neutral-850 flex items-center gap-1">
+                        🖼️ 실제 추진 사례 및 산출물 바로보기
+                      </span>
+                      {selectedTask.attachments && selectedTask.attachments.length > 0 && (
+                        <span className="text-[10px] bg-neutral-200 text-neutral-700 font-mono px-2 py-0.5 rounded-full font-bold">
+                          {Math.min(activeAttachmentIndex + 1, selectedTask.attachments.length)} / {selectedTask.attachments.length}
+                        </span>
+                      )}
+                    </div>
+ 
+                    {selectedTask.attachments && selectedTask.attachments.length > 0 ? (
+                      (() => {
+                        const atts = selectedTask.attachments;
+                        const index = activeAttachmentIndex < atts.length ? activeAttachmentIndex : 0;
+                        const currentAtt = atts[index];
+                        return (
+                          <div className="flex-1 flex flex-col justify-between min-h-0 space-y-4">
+                            {/* Slide Box */}
+                            <div className="relative bg-neutral-900 rounded-xl overflow-hidden aspect-video sm:aspect-square flex flex-col items-center justify-center border border-neutral-800 shadow-md group/carousel max-h-[360px]">
+                              {currentAtt.type === 'image' ? (
+                                <img 
+                                  src={currentAtt.data} 
+                                  alt={currentAtt.name} 
+                                  referrerPolicy="no-referrer"
+                                  className="w-full h-full object-contain hover:scale-[1.03] transition-transform duration-300 pointer-events-none"
+                                />
+                              ) : (
+                                /* Simulated PDF preview inside Slide view */
+                                <div className="w-full h-full bg-white flex flex-col overflow-hidden text-neutral-800 p-4">
+                                  <div className="flex items-center gap-1.5 pb-1.5 border-b border-red-100 mb-2 shrink-0">
+                                    <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
+                                    <span className="text-[10px] font-extrabold text-red-700 font-mono uppercase">UOI 산출 문서 PDF (미리보기)</span>
+                                  </div>
+                                  <div className="flex-1 overflow-y-auto space-y-3 p-2 bg-neutral-50 rounded-lg border border-neutral-200/50 text-[10.5px] leading-relaxed">
+                                    <h5 className="font-bold text-neutral-900 font-sans text-xs underline">
+                                      {currentAtt.name}
+                                    </h5>
+                                    <p className="text-neutral-400 text-[9px] font-mono mb-1">등록일자: {currentAtt.date}</p>
+                                    <div className="text-justify whitespace-pre-wrap text-[10.5px] text-neutral-650 leading-relaxed font-sans">
+                                      {`[빛가람초등학교 IB PYP 연구과제 사례 보고]
+과제 코드: ${selectedTask.taskCode}
+추진 주제: ${selectedTask.title}
+
+이 문서는 학급 교육 현장에서 아이들과 일군 실제 탐구 수업 산출물(학습 결과물, 사진 기록물, 워크시트 소감문 등)을 실시간으로 열람 공유하기 위해 관리자가 첨부한 전자 보고서 파일입니다.
+
+■ 주요 적용 사례 및 학생 성찰 발언록:
+1. 해당 연구과제 실행 후 자율적 문제 해결력 도출 및 주관적 개념 학습도 증진 확인
+2. 학급 내 Wonder Wall 및 토의 기록 분석을 통한 교수 학습 성찰 적용
+3. 평정 결과 성취 기준 및 성찰적 탐구 태도 강화`}
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+ 
+                              {/* Slider Prev / Next buttons over slide */}
+                              {atts.length > 1 && (
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() => setActiveAttachmentIndex(prev => (prev - 1 + atts.length) % atts.length)}
+                                    className="absolute left-2.5 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/60 hover:bg-black/85 text-white flex items-center justify-center font-bold text-lg select-none transition-all cursor-pointer shadow hover:scale-105 z-10"
+                                    title="이전 첨부파일"
+                                  >
+                                    ‹
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setActiveAttachmentIndex(prev => (prev + 1) % atts.length)}
+                                    className="absolute right-2.5 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/60 hover:bg-black/85 text-white flex items-center justify-center font-bold text-lg select-none transition-all cursor-pointer shadow hover:scale-105 z-10"
+                                    title="다음 첨부파일"
+                                  >
+                                    ›
+                                  </button>
+                                </>
+                              )}
+                            </div>
+ 
+                            {/* Slide Meta tools */}
+                            <div className="bg-white p-3 rounded-xl border border-neutral-200/80 flex items-center justify-between shadow-2xs">
+                              <div className="min-w-0 pr-2">
+                                <span className="text-[9px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded font-mono mr-1.5 inline-block select-none shrink-0">
+                                  {currentAtt.type === 'image' ? 'IMAGE' : 'PDF'}
+                                </span>
+                                <span className="text-xs text-neutral-850 font-bold truncate inline-block align-middle max-w-[150px] sm:max-w-xs font-sans" title={currentAtt.name}>
+                                  {currentAtt.name}
+                                </span>
+                              </div>
+                              <div className="flex gap-1 shrink-0">
+                                <button
+                                  type="button"
+                                  onClick={() => setViewingAttachment(currentAtt)}
+                                  className="px-2.5 py-1 bg-neutral-800 hover:bg-neutral-900 text-white rounded text-[10.5px] font-bold cursor-pointer transition-colors"
+                                >
+                                  🔍 크게 열기
+                                </button>
+                                {isAdminMode && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteAttachment(currentAtt.id)}
+                                    className="px-2.5 py-1 bg-red-55 hover:bg-red-100 text-red-600 rounded text-[10.5px] font-bold cursor-pointer transition-colors"
+                                    title="파일 삭제"
+                                  >
+                                    삭제
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+ 
+                            {/* Visual Thumbnail index row */}
+                            {atts.length > 1 && (
+                              <div className="pt-2 border-t border-neutral-200">
+                                <p className="text-[10px] text-neutral-400 font-extrabold mb-1.5 flex items-center gap-1">
+                                  <span>💡 개별 파일 고속 선택</span>
+                                </p>
+                                <div className="flex gap-1.5 overflow-x-auto pb-1 max-h-[60px] scrollbar-thin">
+                                  {atts.map((att, idx) => (
+                                    <button
+                                      key={att.id}
+                                      type="button"
+                                      onClick={() => setActiveAttachmentIndex(idx)}
+                                      className={`relative flex-shrink-0 w-11 h-11 rounded-lg border-2 overflow-hidden transition-all duration-155 cursor-pointer ${
+                                        index === idx ? 'border-blue-600 scale-95 shadow-sm' : 'border-neutral-200 opacity-60 hover:opacity-100'
+                                      }`}
+                                    >
+                                      {att.type === 'image' ? (
+                                        <img src={att.data} referrerPolicy="no-referrer" className="w-full h-full object-cover pointer-events-none" />
+                                      ) : (
+                                        <div className="w-full h-full bg-red-50 text-red-600 flex flex-col items-center justify-center text-[8px] font-black pointer-events-none leading-none">
+                                          <span>PDF</span>
+                                        </div>
+                                      )}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()
+                    ) : (
+                      /* No Attachments Placeholder / "첨부파일이 없는 경우 안내 제공" */
+                      <div className="flex-1 flex flex-col items-center justify-center py-12 px-4 text-center border border-neutral-200 rounded-2xl bg-white space-y-4 min-h-[300px]">
+                        <div className="w-12 h-12 bg-neutral-100 text-neutral-400 rounded-full flex items-center justify-center mx-auto shadow-inner">
+                          <Info className="w-6 h-6 text-neutral-400" />
+                        </div>
+                        <div className="space-y-1">
+                          <h4 className="text-xs font-black text-neutral-800">등록된 첨부파일이 없습니다.</h4>
+                          <p className="text-[10.5px] text-neutral-400 max-w-xs leading-relaxed">
+                            이 연구과제 활동에 업로드된 현장 사진 기록이나 산출물 파일(PDF 문서 등)이 아직 배치되지 않았습니다.
+                          </p>
+                        </div>
+                        {isAdminMode && (
+                          <span className="text-[10px] text-blue-600 font-extrabold bg-blue-50 px-2.5 py-1 rounded-full border border-blue-100 animate-pulse select-none">
+                            💡 왼쪽 아래에서 대량 업로드를 해보세요.
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
  
-                <div className="p-4 border-t border-neutral-100 bg-neutral-50 flex justify-end">
+                {/* Footer Controls */}
+                <div className="p-4 border-t border-neutral-100 bg-neutral-50 flex justify-end shrink-0">
                   <button
                     onClick={() => setSelectedTask(null)}
                     className="px-4 py-2 bg-neutral-800 hover:bg-neutral-900 text-white rounded-lg text-xs font-bold transition-all cursor-pointer"
