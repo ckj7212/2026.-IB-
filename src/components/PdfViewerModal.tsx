@@ -121,7 +121,7 @@ export default function PdfViewerModal({ report, onClose }: PdfViewerModalProps)
             </span>
           )}
 
-          <span className="hidden md:inline text-neutral-500 text-[10.5px] font-mono">빛가람초등학교 IB PYP 연구정보원</span>
+
         </div>
 
         {/* PDF Document Stage */}

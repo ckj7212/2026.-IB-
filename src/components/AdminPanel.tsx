@@ -359,16 +359,21 @@ export default function AdminPanel({ state, onUpdateState, onClose, isAdminMode,
   };
 
   const handleAddGalleryImage = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
 
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      if (typeof reader.result === 'string') {
-        setGalleryUploadedImages(prev => [...prev, reader.result as string]);
-      }
-    };
-    reader.readAsDataURL(file);
+    for (let i = 0; i < files.length; i++) {
+      const file = files.item(i);
+      if (!file) continue;
+
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        if (typeof reader.result === 'string') {
+          setGalleryUploadedImages(prev => [...prev, reader.result as string]);
+        }
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   const handleAddGalleryItem = (e: React.FormEvent) => {
@@ -2058,6 +2063,7 @@ export default function AdminPanel({ state, onUpdateState, onClose, isAdminMode,
                         <input
                           type="file"
                           accept="image/*"
+                          multiple
                           className="hidden"
                           onChange={handleAddGalleryImage}
                         />
@@ -2639,29 +2645,40 @@ export default function AdminPanel({ state, onUpdateState, onClose, isAdminMode,
                           <input 
                             type="file" 
                             accept="image/*"
+                            multiple
                             onChange={(e) => {
-                              const file = e.target.files?.[0];
-                              if (!file) return;
-                              const reader = new FileReader();
-                              reader.onload = () => {
-                                const base64Data = reader.result as string;
-                                const newAttachments = [
-                                  ...(selectedTaskToEdit.attachments || []),
-                                  {
-                                    id: `att-${Date.now()}`,
-                                    name: file.name,
-                                    type: 'image' as const,
-                                    data: base64Data,
-                                    date: new Date().toISOString().split('T')[0]
-                                  }
-                                ];
-                                setSelectedTaskToEdit({
-                                  ...selectedTaskToEdit,
-                                  attachments: newAttachments
-                                });
-                                alert(`이미지 파일 "${file.name}"이 임시 첨부되었습니다. 하단의 [최종 편집내용 저장] 버튼을 누르면 DB에 영구 적용됩니다.`);
-                              };
-                              reader.readAsDataURL(file);
+                              const files = e.target.files;
+                              if (!files || files.length === 0) return;
+                              
+                              for (let i = 0; i < files.length; i++) {
+                                const file = files.item(i);
+                                if (!file) continue;
+                                const index = i;
+                                const reader = new FileReader();
+                                reader.onload = () => {
+                                  if (typeof reader.result !== 'string') return;
+                                  const base64Data = reader.result;
+                                  setSelectedTaskToEdit(prev => {
+                                    if (!prev) return prev;
+                                    const newAttachments = [
+                                      ...(prev.attachments || []),
+                                      {
+                                        id: `att-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 5)}`,
+                                        name: file.name,
+                                        type: 'image' as const,
+                                        data: base64Data,
+                                        date: new Date().toISOString().split('T')[0]
+                                      }
+                                    ];
+                                    return {
+                                      ...prev,
+                                      attachments: newAttachments
+                                    };
+                                  });
+                                };
+                                reader.readAsDataURL(file);
+                              }
+                              alert(`총 ${files.length}개의 이미지 파일이 선택되었습니다. 하단의 [최종 편집내용 저장] 버튼을 누르면 DB에 영구 적용됩니다.`);
                             }}
                             className="block w-full text-xs text-neutral-500 file:mr-2 file:py-1 file:px-2.5 file:rounded file:border-0 file:text-[11px] file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
                           />
@@ -2671,29 +2688,40 @@ export default function AdminPanel({ state, onUpdateState, onClose, isAdminMode,
                           <input 
                             type="file" 
                             accept="application/pdf"
+                            multiple
                             onChange={(e) => {
-                              const file = e.target.files?.[0];
-                              if (!file) return;
-                              const reader = new FileReader();
-                              reader.onload = () => {
-                                const base64Data = reader.result as string;
-                                const newAttachments = [
-                                  ...(selectedTaskToEdit.attachments || []),
-                                  {
-                                    id: `att-${Date.now()}`,
-                                    name: file.name,
-                                    type: 'pdf' as const,
-                                    data: base64Data,
-                                    date: new Date().toISOString().split('T')[0]
-                                  }
-                                ];
-                                setSelectedTaskToEdit({
-                                  ...selectedTaskToEdit,
-                                  attachments: newAttachments
-                                });
-                                alert(`PDF 문서 "${file.name}"이 임시 첨부되었습니다. 하단의 [최종 편집내용 저장] 버튼을 누르면 DB에 영구 적용됩니다.`);
-                              };
-                              reader.readAsDataURL(file);
+                              const files = e.target.files;
+                              if (!files || files.length === 0) return;
+                              
+                              for (let i = 0; i < files.length; i++) {
+                                const file = files.item(i);
+                                if (!file) continue;
+                                const index = i;
+                                const reader = new FileReader();
+                                reader.onload = () => {
+                                  if (typeof reader.result !== 'string') return;
+                                  const base64Data = reader.result;
+                                  setSelectedTaskToEdit(prev => {
+                                    if (!prev) return prev;
+                                    const newAttachments = [
+                                      ...(prev.attachments || []),
+                                      {
+                                        id: `att-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 5)}`,
+                                        name: file.name,
+                                        type: 'pdf' as const,
+                                        data: base64Data,
+                                        date: new Date().toISOString().split('T')[0]
+                                      }
+                                    ];
+                                    return {
+                                      ...prev,
+                                      attachments: newAttachments
+                                    };
+                                  });
+                                };
+                                reader.readAsDataURL(file);
+                              }
+                              alert(`총 ${files.length}개의 PDF 문서가 선택되었습니다. 하단의 [최종 편집내용 저장] 버튼을 누르면 DB에 영구 적용됩니다.`);
                             }}
                             className="block w-full text-xs text-neutral-500 file:mr-2 file:py-1 file:px-2.5 file:rounded file:border-0 file:text-[11px] file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100 cursor-pointer"
                           />
@@ -2901,29 +2929,39 @@ export default function AdminPanel({ state, onUpdateState, onClose, isAdminMode,
                           <input 
                             type="file" 
                             accept="image/*"
+                            multiple
                             onChange={(e) => {
-                              const file = e.target.files?.[0];
-                              if (!file) return;
-                              const reader = new FileReader();
-                              reader.onload = () => {
-                                const base64Data = reader.result as string;
-                                const newAttachments = [
-                                  ...(newTaskForm.attachments || []),
-                                  {
-                                    id: `att-${Date.now()}`,
-                                    name: file.name,
-                                    type: 'image' as const,
-                                    data: base64Data,
-                                    date: new Date().toISOString().split('T')[0]
-                                  }
-                                ];
-                                setNewTaskForm({
-                                  ...newTaskForm,
-                                  attachments: newAttachments
-                                });
-                                alert(`이미지 파일 "${file.name}"이 신설과제에 임시 첨부되었습니다.`);
-                              };
-                              reader.readAsDataURL(file);
+                              const files = e.target.files;
+                              if (!files || files.length === 0) return;
+                              
+                              for (let i = 0; i < files.length; i++) {
+                                const file = files.item(i);
+                                if (!file) continue;
+                                const index = i;
+                                const reader = new FileReader();
+                                reader.onload = () => {
+                                  if (typeof reader.result !== 'string') return;
+                                  const base64Data = reader.result;
+                                  setNewTaskForm(prev => {
+                                    const newAttachments = [
+                                      ...(prev.attachments || []),
+                                      {
+                                        id: `att-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 5)}`,
+                                        name: file.name,
+                                        type: 'image' as const,
+                                        data: base64Data,
+                                        date: new Date().toISOString().split('T')[0]
+                                      }
+                                    ];
+                                    return {
+                                      ...prev,
+                                      attachments: newAttachments
+                                    };
+                                  });
+                                };
+                                reader.readAsDataURL(file);
+                              }
+                              alert(`총 ${files.length}개의 이미지 파일이 신설과제에 임시 첨부되었습니다.`);
                             }}
                             className="block w-full text-xs text-neutral-500 file:mr-2 file:py-1 file:px-2.5 file:rounded file:border-0 file:text-[11px] file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
                           />
@@ -2933,29 +2971,39 @@ export default function AdminPanel({ state, onUpdateState, onClose, isAdminMode,
                           <input 
                             type="file" 
                             accept="application/pdf"
+                            multiple
                             onChange={(e) => {
-                              const file = e.target.files?.[0];
-                              if (!file) return;
-                              const reader = new FileReader();
-                              reader.onload = () => {
-                                const base64Data = reader.result as string;
-                                const newAttachments = [
-                                  ...(newTaskForm.attachments || []),
-                                  {
-                                    id: `att-${Date.now()}`,
-                                    name: file.name,
-                                    type: 'pdf' as const,
-                                    data: base64Data,
-                                    date: new Date().toISOString().split('T')[0]
-                                  }
-                                ];
-                                setNewTaskForm({
-                                  ...newTaskForm,
-                                  attachments: newAttachments
-                                });
-                                alert(`PDF 문서 "${file.name}"이 신설과제에 임시 첨부되었습니다.`);
-                              };
-                              reader.readAsDataURL(file);
+                              const files = e.target.files;
+                              if (!files || files.length === 0) return;
+                              
+                              for (let i = 0; i < files.length; i++) {
+                                const file = files.item(i);
+                                if (!file) continue;
+                                const index = i;
+                                const reader = new FileReader();
+                                reader.onload = () => {
+                                  if (typeof reader.result !== 'string') return;
+                                  const base64Data = reader.result;
+                                  setNewTaskForm(prev => {
+                                    const newAttachments = [
+                                      ...(prev.attachments || []),
+                                      {
+                                        id: `att-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 5)}`,
+                                        name: file.name,
+                                        type: 'pdf' as const,
+                                        data: base64Data,
+                                        date: new Date().toISOString().split('T')[0]
+                                      }
+                                    ];
+                                    return {
+                                      ...prev,
+                                      attachments: newAttachments
+                                    };
+                                  });
+                                };
+                                reader.readAsDataURL(file);
+                              }
+                              alert(`총 ${files.length}개의 PDF 문서가 신설과제에 임시 첨부되었습니다.`);
                             }}
                             className="block w-full text-xs text-neutral-500 file:mr-2 file:py-1 file:px-2.5 file:rounded file:border-0 file:text-[11px] file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100 cursor-pointer"
                           />
