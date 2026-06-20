@@ -1,0 +1,144 @@
+{
+  "entities": {
+    "ReportItem": {
+      "title": "ReportItem",
+      "description": "Research reports or planned publications",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "type": { "type": "string", "enum": ["plan", "mid", "final"] },
+        "title": { "type": "string" },
+        "desc": { "type": "string" },
+        "filename": { "type": "string" },
+        "uploadDate": { "type": "string" },
+        "pdfContentSim": { "type": "string" },
+        "pdfBase64": { "type": "string" }
+      },
+      "required": ["id", "type", "title", "desc", "filename", "uploadDate", "pdfContentSim"]
+    },
+    "ResearchTaskItem": {
+      "title": "ResearchTaskItem",
+      "description": "Specific research task item with metadata and attachments",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "themeNum": { "type": "integer" },
+        "subThemeName": { "type": "string" },
+        "subThemeTitle": { "type": "string" },
+        "taskCode": { "type": "string" },
+        "title": { "type": "string" },
+        "bg": { "type": "string" },
+        "text": { "type": "string" },
+        "methods": { "type": "array" },
+        "cases": { "type": "array" },
+        "resources": { "type": "array" },
+        "resourceLinks": { "type": "array" },
+        "impact": { "type": "string" },
+        "attachments": { "type": "array" }
+      },
+      "required": ["id", "themeNum", "subThemeName", "subThemeTitle", "taskCode", "title", "bg", "text", "methods", "cases", "resources", "impact"]
+    },
+    "LessonItem": {
+      "title": "LessonItem",
+      "description": "Specific inquiry unit or lesson plan",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "grade": { "type": "string" },
+        "theme": { "type": "string" },
+        "teacher": { "type": "string" },
+        "inquiryQuestion": { "type": "string" },
+        "centralIdea": { "type": "string" },
+        "concepts": { "type": "string" },
+        "description": { "type": "string" },
+        "direction": { "type": "string" },
+        "lessonPlanSim": { "type": "string" },
+        "pdfBase64": { "type": "string" },
+        "image": { "type": "string" },
+        "views": { "type": "integer" },
+        "date": { "type": "string" },
+        "period": { "type": "string" },
+        "isOpenLesson": { "type": "boolean" },
+        "materialType": { "type": "string", "enum": ["지도안", "수업자료", "동영상", "학생활동"] }
+      },
+      "required": ["id", "grade", "theme", "teacher", "inquiryQuestion", "centralIdea", "concepts", "description", "direction", "lessonPlanSim", "image", "views", "date", "isOpenLesson", "materialType"]
+    },
+    "GalleryItem": {
+      "title": "GalleryItem",
+      "description": "Community visual activity records and portfolios",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "grade": { "type": "string" },
+        "category": { "type": "string", "enum": ["학습", "Action", "Portfolio"] },
+        "theme": { "type": "string" },
+        "description": { "type": "string" },
+        "images": { "type": "array" },
+        "files": { "type": "array" },
+        "date": { "type": "string" },
+        "pdfBase64": { "type": "string" },
+        "pdfContentSim": { "type": "string" }
+      },
+      "required": ["id", "title", "grade", "category", "theme", "description", "images", "files", "date"]
+    },
+    "CommunityItem": {
+      "title": "CommunityItem",
+      "description": "General sharing board posts and opinions",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "category": { "type": "string", "enum": ["공지", "의견 나눔", "질문과 답변", "공감 게시판"] },
+        "title": { "type": "string" },
+        "author": { "type": "string" },
+        "content": { "type": "string" },
+        "password": { "type": "string" },
+        "date": { "type": "string" },
+        "likes": { "type": "integer" },
+        "views": { "type": "integer" },
+        "comments": { "type": "array" }
+      },
+      "required": ["id", "category", "title", "author", "content", "date", "likes", "views", "comments"]
+    },
+    "PortalMetadata": {
+      "title": "PortalMetadata",
+      "description": "Static configs, basic details, slogans, and footer settings",
+      "type": "object",
+      "properties": {
+        "config": { "type": "object" },
+        "basicInfo": { "type": "object" },
+        "infographic": { "type": "object" },
+        "outcomes": { "type": "object" },
+        "footer": { "type": "object" },
+        "updatedAt": { "type": "integer" }
+      },
+      "required": ["config", "basicInfo", "infographic", "outcomes", "footer"]
+    }
+  },
+  "firestore": {
+    "system/portal_metadata": {
+      "schema": "PortalMetadata",
+      "description": "Primary metadata configs for the custom educational portal"
+    },
+    "reports/{reportId}": {
+      "schema": "ReportItem",
+      "description": "Individual documents for public planned reports"
+    },
+    "researchTasks/{taskId}": {
+      "schema": "ResearchTaskItem",
+      "description": "Detailed research outline tasks with media inline structures"
+    },
+    "lessons/{lessonId}": {
+      "schema": "LessonItem",
+      "description": "Individual documents containing inquiry unit instructions"
+    },
+    "gallery/{galleryId}": {
+      "schema": "GalleryItem",
+      "description": "Visual board events with media attachment references"
+    },
+    "community/{communityId}": {
+      "schema": "CommunityItem",
+      "description": "User interactive share/board logs with multi comments"
+    }
+  }
+}

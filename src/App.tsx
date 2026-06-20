@@ -96,26 +96,36 @@ export default function App() {
           console.warn("LocalStorage fallback load failed:", err);
         }
 
-        // 4. Compare timestamps and find the newest state
+        // 4. Determine state based on saved candidates or fallback to default
         let selectedState: AppState = defaultData;
-        const candidates = [
-          { name: 'server', state: serverState, time: serverState?.updatedAt || 0 },
-          { name: 'indexedDB', state: dbState, time: dbState?.updatedAt || 0 },
-          { name: 'localStorage', state: localState, time: localState?.updatedAt || 0 },
-          { name: 'default', state: defaultData, time: defaultData.updatedAt || 1 } // slight bias for pristine defaults over empty non-timestamps
-        ];
+        
+        const savedCandidates: { name: string; state: AppState; time: number }[] = [];
+        if (serverState) savedCandidates.push({ name: 'server', state: serverState, time: serverState.updatedAt || 0 });
+        if (dbState) savedCandidates.push({ name: 'indexedDB', state: dbState, time: dbState.updatedAt || 0 });
+        if (localState) savedCandidates.push({ name: 'localStorage', state: localState, time: localState.updatedAt || 0 });
 
-        candidates.sort((a, b) => b.time - a.time);
+        if (savedCandidates.length > 0) {
+          // Sort descending by timestamp
+          savedCandidates.sort((a, b) => {
+            if (b.time !== a.time) {
+              return b.time - a.time;
+            }
+            // If timestamps match or are missing (0), use origin of truth preference order: server > indexedDB > localStorage
+            const priority: Record<string, number> = { server: 0, indexedDB: 1, localStorage: 2 };
+            return (priority[a.name] ?? 9) - (priority[b.name] ?? 9);
+          });
 
-        const bestCandidate = candidates.find(c => c.state !== null);
-        if (bestCandidate && bestCandidate.state) {
-          console.log(`Determined newest state from source [${bestCandidate.name}] (timestamp: ${bestCandidate.time})`);
-          selectedState = bestCandidate.state;
+          selectedState = savedCandidates[0].state;
+          console.log(`Determined newest state from source [${savedCandidates[0].name}] (timestamp: ${savedCandidates[0].time})`);
+        } else {
+          console.log("No saved state found. Initializing with pristine default data.");
+          selectedState = defaultData;
         }
 
-        // Force-safety: If the chosen state doesn't have the full set of 13 research tasks, use defaults
-        if (!selectedState.researchTasks || selectedState.researchTasks.length < 13) {
-          console.log("Synchronous recovery: Restoring full 13 updated research tasks to state...");
+        // Force-safety: Only restore defaults if the list is completely missing, 
+        // allowing customized number of elements (experimental adding or removing tasks) to persist safely.
+        if (!selectedState.researchTasks) {
+          console.log("Synchronous recovery: Restoring default research tasks array.");
           selectedState = {
             ...selectedState,
             researchTasks: defaultData.researchTasks

@@ -2,6 +2,7 @@ import express from "express";
 import path from "path";
 import fs from "fs";
 import { createServer as createViteServer } from "vite";
+import { getPortalStateFromFirestore, savePortalStateToFirestore } from "./src/server_firebase.js";
 
 async function startServer() {
   const app = express();
@@ -15,31 +16,64 @@ async function startServer() {
   const STATE_FILE_PATH = path.join(process.cwd(), "src", "default_saved_state.json");
 
   // API endpoint to retrieve the currently persisted server state
-  app.get("/api/state", (req, res) => {
+  app.get("/api/state", async (req, res) => {
     try {
+      // 1. Try reading from Firestore first
+      const firestoreState = await getPortalStateFromFirestore();
+      if (firestoreState) {
+        return res.json(firestoreState);
+      }
+
+      // 2. If Firestore is empty/fresh or not initialized, fallback to reading the local JSON file
+      console.log("Firestore state empty. Loading default state file fallback...");
       if (fs.existsSync(STATE_FILE_PATH)) {
         const fileContent = fs.readFileSync(STATE_FILE_PATH, "utf-8");
-        return res.json(JSON.parse(fileContent));
+        const localState = JSON.parse(fileContent);
+
+        // Auto-seed Firestore on the first run so that we populate the database!
+        try {
+          await savePortalStateToFirestore(localState);
+          console.log("Successfully auto-seeded original local state into Cloud Firestore.");
+        } catch (seedErr) {
+          console.warn("Could not auto-seed local state to Firestore:", seedErr);
+        }
+
+        return res.json(localState);
       }
       return res.json(null);
     } catch (err) {
-      console.error("Failed to read server state file:", err);
+      console.error("Failed to read server state:", err);
       return res.status(500).json({ error: "Failed to read server state" });
     }
   });
 
-  // API endpoint to save state modifications permanently in the codebase
-  app.post("/api/state", (req, res) => {
+  // API endpoint to save state modifications permanently in the codebase and Cloud Firestore
+  app.post("/api/state", async (req, res) => {
     try {
       const newState = req.body;
       if (!newState || Object.keys(newState).length === 0) {
         return res.status(400).json({ error: "No state data provided" });
       }
-      fs.writeFileSync(STATE_FILE_PATH, JSON.stringify(newState, null, 2), "utf-8");
-      console.log("Successfully persisted updated AppState to:", STATE_FILE_PATH);
-      return res.json({ success: true });
+
+      // 1. Save to Cloud Firestore first
+      let firebaseSaved = false;
+      try {
+        firebaseSaved = await savePortalStateToFirestore(newState);
+      } catch (fbErr) {
+        console.error("Failed to save to Firestore:", fbErr);
+      }
+
+      // 2. Always write to the local file configuration as an extra redundant backup
+      try {
+        fs.writeFileSync(STATE_FILE_PATH, JSON.stringify(newState, null, 2), "utf-8");
+        console.log("Successfully persisted updated AppState to local fallback file.");
+      } catch (fsErr) {
+        console.warn("Failed to write to local fallback file:", fsErr);
+      }
+
+      return res.json({ success: true, firebaseSaved });
     } catch (err) {
-      console.error("Failed to write server state file:", err);
+      console.error("Failed to save server state:", err);
       return res.status(500).json({ error: "Failed to save server state" });
     }
   });

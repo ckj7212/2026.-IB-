@@ -402,7 +402,7 @@ export default function ResearchSection({
                         </div>
 
                         <div className="border-t border-neutral-100 pt-3 mt-4 flex items-center justify-between text-xs font-bold text-blue-700 select-none">
-                          <span>스케치 성찰 열람</span>
+                          <span>세부내용 확인</span>
                           <ArrowUpRight className="w-3.5 h-3.5" />
                         </div>
                       </div>
@@ -423,7 +423,7 @@ export default function ResearchSection({
                       Research Task Details
                     </span>
                     <span className="text-neutral-300">|</span>
-                    <span className="text-xs text-neutral-600 font-extrabold">세부내용 성찰</span>
+                    <span className="text-xs text-neutral-600 font-extrabold">세부내용 확인</span>
                   </div>
                   <button 
                     onClick={() => setSelectedTask(null)}
