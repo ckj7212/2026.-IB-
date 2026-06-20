@@ -19,6 +19,22 @@ import { Compass, BookOpen, Clock, Heart, Users, ShieldAlert, CheckCircle2, Chev
 
 const LOCAL_STORAGE_KEY = 'bitgaram_ib_pyp_portal_state';
 
+function getComparableContentString(s: AppState): string {
+  if (!s) return "";
+  return JSON.stringify({
+    config: s.config,
+    basicInfo: s.basicInfo,
+    reports: s.reports,
+    infographic: s.infographic,
+    researchTasks: s.researchTasks,
+    outcomes: s.outcomes,
+    lessons: s.lessons,
+    gallery: s.gallery,
+    community: s.community,
+    footer: s.footer,
+  });
+}
+
 export default function App() {
   const [state, setState] = useState<AppState>(() => {
     try {
@@ -31,6 +47,8 @@ export default function App() {
     }
     return defaultData;
   });
+
+  const lastSavedContentRef = React.useRef<string>("");
 
   // Routing navigation state
   const [currentTab, setCurrentTab] = useState<string>('home');
@@ -152,6 +170,7 @@ export default function App() {
         }
 
         setState(selectedState);
+        lastSavedContentRef.current = getComparableContentString(selectedState);
         setIsInitialized(true);
       } catch (err) {
         console.error("Error running loadInitialState:", err);
@@ -166,10 +185,17 @@ export default function App() {
   useEffect(() => {
     if (!isInitialized) return;
 
+    const currentContentStr = getComparableContentString(state);
+    if (lastSavedContentRef.current && currentContentStr === lastSavedContentRef.current) {
+      return; // Data contents have not changed, do not save or overwrite
+    }
+
     const stateToSave: AppState = {
       ...state,
       updatedAt: Date.now()
     };
+
+    lastSavedContentRef.current = currentContentStr;
 
     // 1. Save to Server-side JSON database
     fetch('/api/state', {
@@ -202,6 +228,53 @@ export default function App() {
       console.warn("localStorage size quota exceeded, saved successfully to server and IndexedDB: ", err);
     }
   }, [state, isInitialized]);
+
+  // Dynamic Background Sync: Poll server state every 8 seconds in the background
+  useEffect(() => {
+    if (!isInitialized) return;
+
+    let isFetching = false;
+    const intervalId = setInterval(async () => {
+      if (isFetching || adminOpen) return; // Skip background overwriting if Admin panel is open/editing
+      isFetching = true;
+
+      try {
+        const res = await fetch(`/api/state?_t=${Date.now()}`, {
+          headers: {
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache',
+            'Expires': '0'
+          }
+        });
+
+        if (res.ok) {
+          const serverState: AppState | null = await res.json();
+          if (serverState && serverState.updatedAt && serverState.config && serverState.basicInfo) {
+            const serverTimestamp = serverState.updatedAt || 0;
+            const localTimestamp = state.updatedAt || 0;
+
+            if (serverTimestamp > localTimestamp) {
+              const serverContent = getComparableContentString(serverState);
+              const localContent = getComparableContentString(state);
+
+              if (serverContent !== localContent) {
+                console.log("Background Sync: Detected newer state on server, auto-synchronizing...");
+                lastSavedContentRef.current = serverContent;
+                setState(serverState);
+                triggerToast("💻 다른 기기에서 수정한 최신 자료로 실시간 동기화되었습니다.");
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.warn("Background sync checking failed:", err);
+      } finally {
+        isFetching = false;
+      }
+    }, 8000);
+
+    return () => clearInterval(intervalId);
+  }, [isInitialized, state.updatedAt, state, adminOpen]);
 
   const triggerToast = (msg: string) => {
     setToastMsg(msg);
