@@ -23,10 +23,53 @@ export default function ResearchSection({
   const [activeThemeTab, setActiveThemeTab] = useState<number>(1);
   const [activeOutcomeTab, setActiveOutcomeTab] = useState<'quantitative' | 'qualitative'>('quantitative');
   const [activeAttachmentIndex, setActiveAttachmentIndex] = useState<number>(0);
+  const [pdfBlobUrls, setPdfBlobUrls] = useState<Record<string, string>>({});
 
   React.useEffect(() => {
     setActiveAttachmentIndex(0);
   }, [selectedTask?.id]);
+
+  React.useEffect(() => {
+    if (!selectedTask || !selectedTask.attachments) {
+      setPdfBlobUrls({});
+      return;
+    }
+
+    const newUrls: Record<string, string> = {};
+    const createdUrls: string[] = [];
+
+    selectedTask.attachments.forEach((att) => {
+      if (att.type === 'pdf' && att.data) {
+        try {
+          const base64Data = att.data;
+          const commaIndex = base64Data.indexOf(',');
+          const base64String = commaIndex !== -1 ? base64Data.substring(commaIndex + 1) : base64Data;
+          const mimeMatch = base64Data.match(/data:([^;]+);base64,/);
+          const mime = mimeMatch ? mimeMatch[1] : 'application/pdf';
+
+          const raw = window.atob(base64String);
+          const rawLength = raw.length;
+          const uInt8Array = new Uint8Array(rawLength);
+          for (let i = 0; i < rawLength; ++i) {
+            uInt8Array[i] = raw.charCodeAt(i);
+          }
+          const blob = new Blob([uInt8Array], { type: mime });
+          const url = URL.createObjectURL(blob);
+          newUrls[att.id] = url;
+          createdUrls.push(url);
+        } catch (err) {
+          console.error("Failed to parse base64 to PDF blobURL:", att.id, err);
+          newUrls[att.id] = att.data;
+        }
+      }
+    });
+
+    setPdfBlobUrls(newUrls);
+
+    return () => {
+      createdUrls.forEach(url => URL.revokeObjectURL(url));
+    };
+  }, [selectedTask]);
 
   const getStepStyles = (index: number) => {
     const styles = [
@@ -657,31 +700,11 @@ export default function ResearchSection({
                                   className="w-full h-full object-contain hover:scale-[1.03] transition-transform duration-300 pointer-events-none"
                                 />
                               ) : (
-                                /* Simulated PDF preview inside Slide view */
-                                <div className="w-full h-full bg-white flex flex-col overflow-hidden text-neutral-800 p-4">
-                                  <div className="flex items-center gap-1.5 pb-1.5 border-b border-red-100 mb-2 shrink-0">
-                                    <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
-                                    <span className="text-[10px] font-extrabold text-red-700 font-mono uppercase">UOI 산출 문서 PDF (미리보기)</span>
-                                  </div>
-                                  <div className="flex-1 overflow-y-auto space-y-3 p-2 bg-neutral-50 rounded-lg border border-neutral-200/50 text-[10.5px] leading-relaxed">
-                                    <h5 className="font-bold text-neutral-900 font-sans text-xs underline">
-                                      {currentAtt.name}
-                                    </h5>
-                                    <p className="text-neutral-400 text-[9px] font-mono mb-1">등록일자: {currentAtt.date}</p>
-                                    <div className="text-justify whitespace-pre-wrap text-[10.5px] text-neutral-650 leading-relaxed font-sans">
-                                      {`[빛가람초등학교 IB PYP 연구과제 사례 보고]
-과제 코드: ${selectedTask.taskCode}
-추진 주제: ${selectedTask.title}
-
-이 문서는 학급 교육 현장에서 아이들과 일군 실제 탐구 수업 산출물(학습 결과물, 사진 기록물, 워크시트 소감문 등)을 실시간으로 열람 공유하기 위해 관리자가 첨부한 전자 보고서 파일입니다.
-
-■ 주요 적용 사례 및 학생 성찰 발언록:
-1. 해당 연구과제 실행 후 자율적 문제 해결력 도출 및 주관적 개념 학습도 증진 확인
-2. 학급 내 Wonder Wall 및 토의 기록 분석을 통한 교수 학습 성찰 적용
-3. 평정 결과 성취 기준 및 성찰적 탐구 태도 강화`}
-                                    </div>
-                                  </div>
-                                </div>
+                                <iframe
+                                  src={pdfBlobUrls[currentAtt.id] || currentAtt.data}
+                                  className="w-full h-full bg-white border-0"
+                                  title={currentAtt.name}
+                                />
                               )}
  
                               {/* Slider Prev / Next buttons over slide */}
@@ -829,34 +852,12 @@ export default function ResearchSection({
                       className="max-w-full max-h-[60vh] object-contain rounded-lg shadow-sm border border-neutral-200"
                     />
                   ) : (
-                    /* Live simulated report/PDF viewer */
-                    <div className="bg-white w-full rounded-xl border border-neutral-200 shadow-sm overflow-hidden flex flex-col">
-                      <div className="p-4 bg-orange-50 border-b border-orange-100 flex items-center gap-2">
-                        <span className="w-2.5 h-2.5 rounded-full bg-orange-500"></span>
-                        <span className="text-xs font-bold text-orange-900 font-mono select-none">PORTABLE DOCUMENT FORMAT (SIMULATION)</span>
-                      </div>
-                      <div className="p-6 sm:p-8 space-y-4 max-h-[50vh] overflow-y-auto text-neutral-800">
-                        <div className="border-b border-neutral-200 pb-4 text-center">
-                          <h4 className="text-base font-bold text-neutral-900 leading-snug">{viewingAttachment.name}</h4>
-                          <p className="text-[10px] text-neutral-400 mt-1.5 font-mono">Date Attached: {viewingAttachment.date} | Simulated Document Engine v1.1</p>
-                        </div>
-                        
-                        <div className="space-y-3 leading-relaxed text-sm text-neutral-700 text-justify">
-                          <p className="font-semibold text-neutral-950 font-sans">본 문서 파일은 연구학교 사례 산출물로서 첨부 구동된 PDF의 모사 가치 기록물물입니다.</p>
-                          <div className="p-4 bg-neutral-50 rounded-lg border border-neutral-200/50 font-mono text-[11px] whitespace-pre-wrap leading-relaxed">
-                            {`[빛가람초등학교 IB PYP 연구과제 사례 보고서]
-과제 코드: ${selectedTask.taskCode}
-추진 주제: ${selectedTask.title}
-
-본 문서는 실제 교육 현장에서 도출된 핵심 교육 산출물(사례사진, 워크북 기록, 참관성찰편지 등)을 관리지가 전자 첨부하여 가독적으로 열람할 수 있도록 지원하는 포스트 문서 템플릿입니다.
-
-■ 주요 적용 사례 및 학생 성찰 발언록:
-1. 해당 연구과제 실행 후 개념적 학습 인식 및 자기 주도적 문제 해결력 도출 확인
-2. Wonder Wall 및 토의 기록 분석을 통한 교수 학습 설계 고도화
-3. 삼주체(학습자-교원-학부모) 간의 지속가능한 상호 연대지표 증가`}
-                          </div>
-                        </div>
-                      </div>
+                    <div className="w-full h-[70vh] bg-white rounded-xl overflow-hidden border border-neutral-200 shadow-md">
+                      <iframe
+                        src={pdfBlobUrls[viewingAttachment.id] || viewingAttachment.data}
+                        className="w-full h-full bg-neutral-950 border-0"
+                        title={viewingAttachment.name}
+                      />
                     </div>
                   )}
                 </div>
