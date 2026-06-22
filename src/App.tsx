@@ -135,49 +135,21 @@ export default function App() {
           console.warn("LocalStorage fallback load failed:", err);
         }
 
-        // 4. Fallback resolution with Auto-Restoration Healing scheme
+        // 4. Fallback resolution. Server is ALWAYS the absolute source of truth!
         let selectedState: AppState = defaultData;
-        const defaultContentStr = getComparableContentString(defaultData);
 
-        // Check if there was any customized data previously stored on this device's browser
-        const bestLocal = dbState || localState;
-        const localIsCustom = bestLocal ? (getComparableContentString(bestLocal) !== defaultContentStr) : false;
-        const serverIsCustom = serverState ? (getComparableContentString(serverState) !== defaultContentStr) : false;
-
-        let needToUploadLocal = false;
-
-        if (serverState && serverIsCustom) {
-          // Cloud server has customized state
-          if (bestLocal && localIsCustom) {
-            // Both cloud and device have custom states. Use whichever has newest timestamp!
-            const serverTime = serverState.updatedAt || 0;
-            const localTime = bestLocal.updatedAt || 0;
-            
-            if (localTime > serverTime) {
-              console.log("Device has NEWER customized state. Healing server state with local copy.");
-              selectedState = bestLocal;
-              needToUploadLocal = true;
-            } else {
-              console.log("Cloud has newer customized state. Syncing local with cloud.");
-              selectedState = serverState;
-            }
-          } else {
-            // Fresh device with no local customized data. Directly synchronize from cloud.
-            console.log("Fresh device. Pulling customized cloud state.");
-            selectedState = serverState;
-          }
+        if (serverState) {
+          console.log("Successfully connected to server. Using server's official master state.");
+          selectedState = serverState;
         } else {
-          // Cloud server state is empty or equivalent to pristine defaultData
-          if (bestLocal && localIsCustom) {
-            // Disaster recovery helper: Server is empty but this device has our custom state backup.
-            // Automatically push this device's data to cloud!
-            console.log("Database initialized empty but this browser holds custom edits. Auto-restoring to Cloud!");
+          // Offline failover fallback
+          const bestLocal = dbState || localState;
+          if (bestLocal) {
+            console.log("Server state unavailable. Falling back to local offline backup cache.");
             selectedState = bestLocal;
-            needToUploadLocal = true;
           } else {
-            // Net fresh environment everywhere
-            console.log("No custom data found in cloud or browser cache. Starting fresh.");
-            selectedState = serverState || defaultData;
+            console.log("No server or local state found. Starting fresh with compiled defaultData.");
+            selectedState = defaultData;
           }
         }
 
@@ -194,27 +166,6 @@ export default function App() {
         setState(selectedState);
         lastSavedContentRef.current = getComparableContentString(selectedState);
         setIsInitialized(true);
-
-        if (needToUploadLocal) {
-          // Attach a fresh timestamp so that all other devices immediately pull this healed/recovered version
-          const stateToSave = {
-            ...selectedState,
-            updatedAt: Date.now()
-          };
-          fetch('/api/state', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(stateToSave)
-          })
-          .then(res => {
-            if (res.ok) {
-              triggerToast("🎉 기존 브라우저 보관 자료가 클라우드 정식 데이터베이스로 자동 업로드 및 복원되었습니다!");
-            }
-          })
-          .catch(err => console.error("Auto recovery backup upload failed:", err));
-        }
       } catch (err) {
         console.error("Error running loadInitialState:", err);
         setIsInitialized(true);

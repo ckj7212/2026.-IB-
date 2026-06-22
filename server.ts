@@ -3,6 +3,7 @@ import path from "path";
 import fs from "fs";
 import { createServer as createViteServer } from "vite";
 import { getPortalStateFromFirestore, savePortalStateToFirestore } from "./src/server_firebase.js";
+import { defaultData } from "./src/defaultData.js";
 
 async function startServer() {
   const app = express();
@@ -29,26 +30,38 @@ async function startServer() {
         return res.json(firestoreState);
       }
 
-      // 2. If Firestore is empty/fresh or not initialized, fallback to reading the local JSON file
-      console.log("Firestore state empty. Loading default state file fallback...");
+      // 2. If Firestore is empty/fresh or not initialized, load either local file backup or defaultData
+      console.log("Firestore state empty. Bootstrapping state...");
+      let bootstrapState = defaultData;
+
       if (fs.existsSync(STATE_FILE_PATH)) {
-        const fileContent = fs.readFileSync(STATE_FILE_PATH, "utf-8");
-        const localState = JSON.parse(fileContent);
-
-        // Auto-seed Firestore on the first run so that we populate the database!
         try {
-          await savePortalStateToFirestore(localState);
-          console.log("Successfully auto-seeded original local state into Cloud Firestore.");
-        } catch (seedErr) {
-          console.warn("Could not auto-seed local state to Firestore:", seedErr);
+          const fileContent = fs.readFileSync(STATE_FILE_PATH, "utf-8");
+          const parsed = JSON.parse(fileContent);
+          if (parsed && parsed.config && parsed.basicInfo) {
+            bootstrapState = parsed;
+            console.log("Loaded bootstrap state from local JSON backup file.");
+          }
+        } catch (readErr) {
+          console.warn("Failed to read local STATE_FILE_PATH backup, using defaultData:", readErr);
         }
-
-        return res.json(localState);
+      } else {
+        console.log("No local JSON backup file exists. Bootstrapping with compiled defaultData.");
       }
-      return res.json(null);
+
+      // Auto-seed Firestore so we populate the database!
+      try {
+        await savePortalStateToFirestore(bootstrapState);
+        console.log("Successfully auto-seeded original bootstrap state into Cloud Firestore.");
+      } catch (seedErr) {
+        console.warn("Could not auto-seed bootstrap state to Firestore:", seedErr);
+      }
+
+      return res.json(bootstrapState);
     } catch (err) {
       console.error("Failed to read server state:", err);
-      return res.status(500).json({ error: "Failed to read server state" });
+      // Fallback return defaultData directly to avoid breaking client-side lifecycle even on total error
+      return res.json(defaultData);
     }
   });
 
