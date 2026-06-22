@@ -135,27 +135,49 @@ export default function App() {
           console.warn("LocalStorage fallback load failed:", err);
         }
 
-        // 4. Fallback resolution: Shared database (Cloud Firestore / Server State) is the absolute SOURCE OF TRUTH
-        // to prevent stale local devices from overwriting server-wide contributions made by other users.
+        // 4. Fallback resolution with Auto-Restoration Healing scheme
         let selectedState: AppState = defaultData;
-        
-        if (serverState) {
-          console.log("Resolved state from central shared Cloud Firestore datastore.");
-          selectedState = serverState;
-        } else {
-          console.log("Server unreachable. Resolving fallback from local device cache...");
-          const savedCandidates: { name: string; state: AppState; time: number }[] = [];
-          if (dbState) savedCandidates.push({ name: 'indexedDB', state: dbState, time: dbState.updatedAt || 0 });
-          if (localState) savedCandidates.push({ name: 'localStorage', state: localState, time: localState.updatedAt || 0 });
+        const defaultContentStr = getComparableContentString(defaultData);
 
-          if (savedCandidates.length > 0) {
-            // Sort descending by timestamp
-            savedCandidates.sort((a, b) => b.time - a.time);
-            selectedState = savedCandidates[0].state;
-            console.log(`Determined newest fallback state from source [${savedCandidates[0].name}] (timestamp: ${savedCandidates[0].time})`);
+        // Check if there was any customized data previously stored on this device's browser
+        const bestLocal = dbState || localState;
+        const localIsCustom = bestLocal ? (getComparableContentString(bestLocal) !== defaultContentStr) : false;
+        const serverIsCustom = serverState ? (getComparableContentString(serverState) !== defaultContentStr) : false;
+
+        let needToUploadLocal = false;
+
+        if (serverState && serverIsCustom) {
+          // Cloud server has customized state
+          if (bestLocal && localIsCustom) {
+            // Both cloud and device have custom states. Use whichever has newest timestamp!
+            const serverTime = serverState.updatedAt || 0;
+            const localTime = bestLocal.updatedAt || 0;
+            
+            if (localTime > serverTime) {
+              console.log("Device has NEWER customized state. Healing server state with local copy.");
+              selectedState = bestLocal;
+              needToUploadLocal = true;
+            } else {
+              console.log("Cloud has newer customized state. Syncing local with cloud.");
+              selectedState = serverState;
+            }
           } else {
-            console.log("No saved state found. Initializing with pristine default data.");
-            selectedState = defaultData;
+            // Fresh device with no local customized data. Directly synchronize from cloud.
+            console.log("Fresh device. Pulling customized cloud state.");
+            selectedState = serverState;
+          }
+        } else {
+          // Cloud server state is empty or equivalent to pristine defaultData
+          if (bestLocal && localIsCustom) {
+            // Disaster recovery helper: Server is empty but this device has our custom state backup.
+            // Automatically push this device's data to cloud!
+            console.log("Database initialized empty but this browser holds custom edits. Auto-restoring to Cloud!");
+            selectedState = bestLocal;
+            needToUploadLocal = true;
+          } else {
+            // Net fresh environment everywhere
+            console.log("No custom data found in cloud or browser cache. Starting fresh.");
+            selectedState = serverState || defaultData;
           }
         }
 
@@ -172,6 +194,27 @@ export default function App() {
         setState(selectedState);
         lastSavedContentRef.current = getComparableContentString(selectedState);
         setIsInitialized(true);
+
+        if (needToUploadLocal) {
+          // Attach a fresh timestamp so that all other devices immediately pull this healed/recovered version
+          const stateToSave = {
+            ...selectedState,
+            updatedAt: Date.now()
+          };
+          fetch('/api/state', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(stateToSave)
+          })
+          .then(res => {
+            if (res.ok) {
+              triggerToast("🎉 기존 브라우저 보관 자료가 클라우드 정식 데이터베이스로 자동 업로드 및 복원되었습니다!");
+            }
+          })
+          .catch(err => console.error("Auto recovery backup upload failed:", err));
+        }
       } catch (err) {
         console.error("Error running loadInitialState:", err);
         setIsInitialized(true);
@@ -229,7 +272,7 @@ export default function App() {
     }
   }, [state, isInitialized]);
 
-  // Dynamic Background Sync: Poll server state every 8 seconds in the background
+  // Dynamic Background Sync: Poll server state every 5 seconds in the background
   useEffect(() => {
     if (!isInitialized) return;
 
@@ -261,7 +304,7 @@ export default function App() {
                 console.log("Background Sync: Detected newer state on server, auto-synchronizing...");
                 lastSavedContentRef.current = serverContent;
                 setState(serverState);
-                triggerToast("💻 다른 기기에서 수정한 최신 자료로 실시간 동기화되었습니다.");
+                triggerToast("💻 다른 기기에서 수정한 최신 자료로 실시간 자동 동기화되었습니다.");
               }
             }
           }
@@ -271,7 +314,7 @@ export default function App() {
       } finally {
         isFetching = false;
       }
-    }, 8000);
+    }, 5000); // 5 seconds for instant Feel!
 
     return () => clearInterval(intervalId);
   }, [isInitialized, state.updatedAt, state, adminOpen]);
