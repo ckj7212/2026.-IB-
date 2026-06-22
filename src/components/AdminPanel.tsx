@@ -781,6 +781,43 @@ export default function AdminPanel({ state, onUpdateState, onClose, isAdminMode,
     }
   };
 
+  const commitToCodebase = async () => {
+    if (!confirm('🚨 [초강력 소스코드 각인 경고]\n\n정말로 "현재 내 화면 상태"를 이 웹페이지의 "물리적 원본 소스코드"로 완전히 하드코딩 박제(Overbake)하시겠습니까?\n\n이 작업이 완료되면, 현재 화면 상의 모든 텍스트, PDF 파일 목록, 배너 등 데이터가 소스코드 파일(src/defaultData.ts) 자체에 바이트 레벨로 직접 덮어씌워 보존됩니다.\n\n이것은 모바일 브라우저의 악질적인 "캐시(Cache) 기억 수명 불일치"를 원천 무효화하며, 전 세계 어떤 기기에서든지 신규로 접속할 때 무조건 현재 정돈된 이 결과물 화면이 오피셜 기본 환경(Compiled Core Baseline)으로서 보장됩니다.')) {
+      return;
+    }
+    setIsSyncing(true);
+    try {
+      const res = await fetch('/api/commit-to-codebase', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(state)
+      });
+      if (res.ok) {
+        const result = await res.json();
+        
+        // Overwrite local memory too for synchrony on this browser
+        localStorage.setItem('bitgaram_ib_pyp_portal_state', JSON.stringify(state));
+        try {
+          const { storeAsset } = await import('../lib/idb');
+          await storeAsset('app_state_v2', state);
+        } catch (dbErr) {
+          console.warn("IndexedDB overwrite failed during codebase commit:", dbErr);
+        }
+        
+        alert('🎯 [물리 소스코드 주입 성료!] 현재 화면의 데이터들이 앱 빌드의 핵심 줄기(src/defaultData.ts와 서버 파일) 속으로 영구 주입(Bake) 완료되었습니다!\n\n이제 빌드 프로세스의 최신 정식 버전으로 즉각 일체화되었으며, 모바일과 PC 가릴 것 없이 이 기준에 무조건 종속되어 화면이 통일됩니다.');
+      } else {
+        const errorData = await res.json();
+        throw new Error(errorData.error || `응답 실패 (코드: ${res.status})`);
+      }
+    } catch (err) {
+      alert('⚠️ 소스코드 주입 처리 도중 장애가 발생했습니다: ' + err);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
 
   // UN-AUTHORIZED SCREEN
   if (!isAuthorized) {
@@ -3415,7 +3452,7 @@ export default function AdminPanel({ state, onUpdateState, onClose, isAdminMode,
                   </div>
 
                   {/* Operational Core Actions */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 pt-2">
                     
                     {/* Action 1: Force Outward Deploy */}
                     <div className="p-4 bg-amber-500/5 hover:bg-amber-500/8 transition-colors rounded-xl border border-amber-500/10 space-y-3 flex flex-col justify-between">
@@ -3458,6 +3495,29 @@ export default function AdminPanel({ state, onUpdateState, onClose, isAdminMode,
                       >
                         <RefreshCw className="w-3.5 h-3.5 text-neutral-300" />
                         <span>서버의 정식 마스터 데이터로 스마트폰 강제 로드 (기기 치유)</span>
+                      </button>
+                    </div>
+
+                    {/* Action 3: Commit / Bake State directly into Codebase */}
+                    <div className="p-4 bg-emerald-500/5 hover:bg-emerald-500/8 transition-colors rounded-xl border border-emerald-500/20 space-y-3 flex flex-col justify-between">
+                      <div className="space-y-1.5">
+                        <span className="text-[10px] px-2 py-0.5 rounded-sm bg-emerald-500/20 text-emerald-400 font-bold tracking-wider font-mono">ACTION C</span>
+                        <h4 className="text-xs sm:text-sm font-extrabold text-neutral-100 flex items-center gap-1.5">
+                          <Sparkles className="w-4 h-4 text-emerald-400 animate-pulse animate-duration-1005" />
+                          <span>🛠️ 내 프리뷰 화면으로 원본 소스코드 덮어쓰기</span>
+                        </h4>
+                        <p className="text-[11px] text-neutral-400 leading-relaxed text-justify font-sans">
+                          <strong>"현재 프리뷰 화면 상태를 이 웹 포털의 완전 고정 불변 마스터 기본값으로 구워 배포하겠다!"</strong> 할 때 사용합니다. 이 버튼을 클릭하면 현재 이 화면 데이터들이 프로젝트 소스코드 본명(<code>src/defaultData.ts</code>)에 하드코딩 주입되어, 캐시 기억 수명이 꼬여버린 스마트폰이라도 공장 출하 초기값으로 본 버전을 정착시켜 보여줍니다.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={commitToCodebase}
+                        disabled={isSyncing}
+                        className="w-full mt-3 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 disabled:from-neutral-800 disabled:to-neutral-800 text-neutral-950 font-black rounded-lg text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-md select-none border-0"
+                      >
+                        <Save className="w-3.5 h-3.5 text-neutral-950" />
+                        <span>원본 소스코드(src/defaultData.ts) 영구 박제하기 (오버베이크)</span>
                       </button>
                     </div>
 

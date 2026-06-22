@@ -122,6 +122,54 @@ async function startServer() {
     }
   });
 
+  // API endpoint to compile and lock current preview state into the permanent source files (src/defaultData.ts and STATE_FILE_PATH)
+  app.post("/api/commit-to-codebase", async (req, res) => {
+    try {
+      const stateToCommit = req.body;
+      if (!stateToCommit || !stateToCommit.config || !stateToCommit.basicInfo) {
+        return res.status(400).json({ error: "No state data provided for commit" });
+      }
+
+      // Update the timestamp
+      stateToCommit.updatedAt = Date.now();
+
+      const DEFAULT_DATA_PATH = path.join(process.cwd(), "src", "defaultData.ts");
+
+      // 1. Write to defaultData.ts (Typescript File)
+      try {
+        // Prepare TypeScript string representation
+        const tsContent = `// Automatically committed version on ${new Date().toLocaleString('ko-KR')}\nimport { AppState } from "./types";\n\nexport const defaultData: AppState = ${JSON.stringify(stateToCommit, null, 2)};\n`;
+        fs.writeFileSync(DEFAULT_DATA_PATH, tsContent, "utf-8");
+        console.log(`[COMMIT] Successfully overwrote ${DEFAULT_DATA_PATH} with current preview state.`);
+      } catch (tsErr) {
+        console.error("Failed to overwrite src/defaultData.ts file:", tsErr);
+        return res.status(500).json({ error: "Failed to write onto src/defaultData.ts" });
+      }
+
+      // 2. Write to local fallback default_saved_state.json
+      try {
+        fs.writeFileSync(STATE_FILE_PATH, JSON.stringify(stateToCommit, null, 2), "utf-8");
+        console.log(`[COMMIT] Successfully overwrote ${STATE_FILE_PATH}`);
+      } catch (jsonErr) {
+        console.warn("Failed to overwrite default_saved_state.json:", jsonErr);
+      }
+
+      // 3. Keep Firestore in sync
+      let firebaseSaved = false;
+      try {
+        firebaseSaved = await savePortalStateToFirestore(stateToCommit);
+        console.log("[COMMIT] Firestore synchronized with committed codebase state.");
+      } catch (fbErr) {
+        console.error("Failed to save committed state to Firestore:", fbErr);
+      }
+
+      return res.json({ success: true, firebaseSaved, message: "Successfully committed preview state directly into physical source code!" });
+    } catch (err) {
+      console.error("Failed to commit state to codebase:", err);
+      return res.status(500).json({ error: "Server error during codebase commit" });
+    }
+  });
+
   // API endpoint to save state modifications permanently in the codebase and Cloud Firestore
   app.post("/api/state", async (req, res) => {
     try {
