@@ -94,8 +94,9 @@ export interface GalleryItem {
   images: string[];             // Multi-image list (Base64 or placeholder refs)
   files: string[];              // Related filenames
   date: string;
-  pdfBase64?: string;           // Base64 file string for real uploaded PDF display
+  pdfBase64?: string;           // Base64 file string for real uploaded PDF display (legacy single PDF)
   pdfContentSim?: string;       // Simulated text content for the inline viewer
+  pdfFiles?: { name: string; base64: string }[]; // Support for multiple PDF files!
 }
 
 export interface CommentItem {

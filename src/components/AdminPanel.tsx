@@ -339,7 +339,8 @@ export default function AdminPanel({ state, onUpdateState, onClose, isAdminMode,
     description: '',
     files: [],
     pdfBase64: '',
-    pdfContentSim: ''
+    pdfContentSim: '',
+    pdfFiles: []
   });
   const [galleryUploadedImages, setGalleryUploadedImages] = useState<string[]>([]);
 
@@ -353,7 +354,8 @@ export default function AdminPanel({ state, onUpdateState, onClose, isAdminMode,
       description: item.description,
       files: item.files || [],
       pdfBase64: item.pdfBase64 || '',
-      pdfContentSim: item.pdfContentSim || ''
+      pdfContentSim: item.pdfContentSim || '',
+      pdfFiles: item.pdfFiles || []
     });
     setGalleryUploadedImages(item.images || []);
   };
@@ -382,7 +384,8 @@ export default function AdminPanel({ state, onUpdateState, onClose, isAdminMode,
       alert('갤러리 제목을 입력해 주세요.');
       return;
     }
-    if (galleryUploadedImages.length === 0 && !galleryForm.pdfBase64) {
+    const hasPdfs = (galleryForm.pdfFiles && galleryForm.pdfFiles.length > 0) || galleryForm.pdfBase64;
+    if (galleryUploadedImages.length === 0 && !hasPdfs) {
       alert('활동 대표 이미지 또는 실제 PDF 파일 중 최소 1개는 포함되어야 합니다.');
       return;
     }
@@ -399,8 +402,9 @@ export default function AdminPanel({ state, onUpdateState, onClose, isAdminMode,
         theme: galleryForm.theme || '세계가 돌아가는 방식 (How the World Works)',
         description: galleryForm.description || '',
         images: galleryUploadedImages,
-        files: defaultPdfName,
-        pdfBase64: galleryForm.pdfBase64 || undefined,
+        files: galleryForm.pdfFiles && galleryForm.pdfFiles.length > 0 ? galleryForm.pdfFiles.map(x => x.name) : defaultPdfName,
+        pdfBase64: galleryForm.pdfFiles && galleryForm.pdfFiles.length > 0 ? galleryForm.pdfFiles[0].base64 : (galleryForm.pdfBase64 || undefined),
+        pdfFiles: galleryForm.pdfFiles || [],
         pdfContentSim: galleryForm.pdfContentSim || galleryForm.description
       } : g);
 
@@ -420,8 +424,9 @@ export default function AdminPanel({ state, onUpdateState, onClose, isAdminMode,
         theme: galleryForm.theme || '세계가 돌아가는 방식 (How the World Works)',
         description: galleryForm.description || '',
         images: galleryUploadedImages,
-        files: defaultPdfName,
-        pdfBase64: galleryForm.pdfBase64 || undefined,
+        files: galleryForm.pdfFiles && galleryForm.pdfFiles.length > 0 ? galleryForm.pdfFiles.map(x => x.name) : defaultPdfName,
+        pdfBase64: galleryForm.pdfFiles && galleryForm.pdfFiles.length > 0 ? galleryForm.pdfFiles[0].base64 : (galleryForm.pdfBase64 || undefined),
+        pdfFiles: galleryForm.pdfFiles || [],
         pdfContentSim: galleryForm.pdfContentSim || galleryForm.description,
         date: new Date().toISOString().substring(0, 10)
       };
@@ -442,7 +447,8 @@ export default function AdminPanel({ state, onUpdateState, onClose, isAdminMode,
       description: '',
       files: [],
       pdfBase64: '',
-      pdfContentSim: ''
+      pdfContentSim: '',
+      pdfFiles: []
     });
     setGalleryUploadedImages([]);
   };
@@ -2093,46 +2099,78 @@ export default function AdminPanel({ state, onUpdateState, onClose, isAdminMode,
 
                   {/* PDF Portfolio Upload space */}
                   <div className="p-3 bg-red-50/50 border border-red-100 rounded-lg space-y-2">
-                    <label className="font-bold text-red-800 block">📄 [선택] 실제 PDF 포트폴리오/보고서 원본 탑재</label>
+                    <label className="font-bold text-red-800 block">📄 [선택] 실제 PDF 포트폴리오/보고서 원본 탑재 (다중 선택 가능)</label>
                     <div className="flex flex-col sm:flex-row sm:items-center gap-3">
                       <label className="px-3 py-1.5 bg-red-650 hover:bg-red-750 text-white rounded text-[11px] font-bold block text-center cursor-pointer flex items-center gap-1 shrink-0 w-fit">
                         <Upload className="w-3.5 h-3.5" />
-                        <span>PDF 파일 선택</span>
+                        <span>PDF 파일 선택 (다중)</span>
                         <input
                           type="file"
                           accept="application/pdf"
+                          multiple
                           className="hidden"
                           onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (file) {
-                              handleImageUpload(e, (base64) => {
-                                setGalleryForm(prev => ({
-                                  ...prev,
-                                  pdfBase64: base64,
-                                  files: [file.name]
-                                }));
-                              });
+                            const files = e.target.files;
+                            if (files && files.length > 0) {
+                              const loadedPdfs: { name: string; base64: string }[] = [];
+                              let completed = 0;
+                              for (let i = 0; i < files.length; i++) {
+                                const file = files[i];
+                                const reader = new FileReader();
+                                reader.onloadend = () => {
+                                  if (typeof reader.result === 'string') {
+                                    loadedPdfs.push({ name: file.name, base64: reader.result });
+                                  }
+                                  completed++;
+                                  if (completed === files.length) {
+                                    setGalleryForm(prev => {
+                                      const combined = [...(prev.pdfFiles || []), ...loadedPdfs];
+                                      return {
+                                        ...prev,
+                                        pdfFiles: combined,
+                                        pdfBase64: combined.length > 0 ? combined[0].base64 : '',
+                                        files: combined.map(x => x.name)
+                                      };
+                                    });
+                                  }
+                                };
+                                reader.readAsDataURL(file);
+                              }
                             }
                           }}
                         />
                       </label>
-                      <div className="text-xs">
-                        {galleryForm.pdfBase64 ? (
-                          <div className="flex items-center gap-2 text-emerald-700 font-bold">
-                            <span>✔️ 업로드 완료: {galleryForm.files?.[0] || 'portfolio.pdf'}</span>
+                      <span className="text-neutral-500 text-[11px]">* PDF 포트폴리오 파일들을 여러 개 첨부할 수 있습니다.</span>
+                    </div>
+
+                    {/* Attached PDFs List render */}
+                    {galleryForm.pdfFiles && galleryForm.pdfFiles.length > 0 && (
+                      <div className="mt-2 space-y-1 bg-white p-2 border border-red-100 rounded max-h-40 overflow-y-auto">
+                        <p className="text-[10px] text-neutral-400 font-bold mb-1">첨부된 PDF 파일 ({galleryForm.pdfFiles.length}개):</p>
+                        {galleryForm.pdfFiles.map((pdf, idx) => (
+                          <div key={idx} className="flex items-center justify-between gap-2 p-1 hover:bg-neutral-50 rounded">
+                            <span className="text-[10.5px] text-neutral-700 font-medium truncate shrink-0 max-w-[180px] sm:max-w-xs block">📄 {pdf.name}</span>
                             <button
                               type="button"
-                              onClick={() => setGalleryForm(prev => ({ ...prev, pdfBase64: '', files: [] }))}
-                              className="text-red-500 hover:text-red-700 underline text-[10.5px]"
+                              onClick={() => {
+                                setGalleryForm(prev => {
+                                  const filtered = (prev.pdfFiles || []).filter((_, i) => i !== idx);
+                                  return {
+                                    ...prev,
+                                    pdfFiles: filtered,
+                                    pdfBase64: filtered.length > 0 ? filtered[0].base64 : '',
+                                    files: filtered.map(x => x.name)
+                                  };
+                                });
+                              }}
+                              className="text-red-650 hover:text-red-800 text-[10.5px] underline cursor-pointer shrink-0 font-bold"
                             >
                               제거
                             </button>
                           </div>
-                        ) : (
-                          <span className="text-neutral-500 text-[11px]">* PDF 포트폴리오 파일(학습산출물 등)을 탑재할 수 있습니다.</span>
-                        )}
+                        ))}
                       </div>
-                    </div>
+                    )}
                   </div>
 
                   <div className="flex gap-2">

@@ -34,6 +34,7 @@ export default function GallerySection({ state, currentSubTab, onViewPdf, onUpda
   const [newItemImages, setNewItemImages] = useState<string[]>([]);
   const [newItemPdfBase64, setNewItemPdfBase64] = useState('');
   const [newItemPdfName, setNewItemPdfName] = useState('');
+  const [newItemPdfs, setNewItemPdfs] = useState<{ name: string; base64: string }[]>([]);
 
   // Keyboard navigation listener inside lightbox
   useEffect(() => {
@@ -142,17 +143,34 @@ export default function GallerySection({ state, currentSubTab, onViewPdf, onUpda
   };
 
   const handleNewPdfAdd = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
 
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      if (typeof reader.result === 'string') {
-        setNewItemPdfBase64(reader.result);
-        setNewItemPdfName(file.name);
-      }
-    };
-    reader.readAsDataURL(file as any);
+    const loadedPdfs: { name: string; base64: string }[] = [];
+    let completed = 0;
+
+    for (let i = 0; i < files.length; i++) {
+       const file = files[i];
+       const reader = new FileReader();
+       reader.onloadend = () => {
+         if (typeof reader.result === 'string') {
+           loadedPdfs.push({ name: file.name, base64: reader.result });
+         }
+         completed++;
+         if (completed === files.length) {
+           setNewItemPdfs(prev => {
+             const updated = [...prev, ...loadedPdfs];
+             // For fallback, keep setting first PDF info
+             if (updated.length > 0) {
+               setNewItemPdfBase64(updated[0].base64);
+               setNewItemPdfName(updated[0].name);
+             }
+             return updated;
+           });
+         }
+       };
+       reader.readAsDataURL(file as any);
+    }
   };
 
   const handleSubmitNewItem = (e: React.FormEvent) => {
@@ -161,7 +179,8 @@ export default function GallerySection({ state, currentSubTab, onViewPdf, onUpda
       alert('갤러리 제목을 입력해 주세요.');
       return;
     }
-    if (newItemImages.length === 0 && !newItemPdfBase64) {
+    const hasPdfs = newItemPdfs.length > 0 || newItemPdfBase64;
+    if (newItemImages.length === 0 && !hasPdfs) {
       alert('활동 대표 사진 또는 첨부 PDF 보고서 중 최소 1개는 포함되어야 합니다.');
       return;
     }
@@ -174,8 +193,9 @@ export default function GallerySection({ state, currentSubTab, onViewPdf, onUpda
       theme: newItemTheme,
       description: newItemDescription || '선생님이 등록하신 활동 설명입니다.',
       images: newItemImages,
-      files: newItemPdfName ? [newItemPdfName] : [],
-      pdfBase64: newItemPdfBase64 || undefined,
+      files: newItemPdfs.length > 0 ? newItemPdfs.map(x => x.name) : (newItemPdfName ? [newItemPdfName] : []),
+      pdfBase64: newItemPdfs.length > 0 ? newItemPdfs[0].base64 : (newItemPdfBase64 || undefined),
+      pdfFiles: newItemPdfs,
       pdfContentSim: newItemDescription || '선생님이 등록하신 활동 원본 포트폴리오입니다.',
       date: new Date().toISOString().substring(0, 10)
     };
@@ -195,6 +215,7 @@ export default function GallerySection({ state, currentSubTab, onViewPdf, onUpda
       setNewItemImages([]);
       setNewItemPdfBase64('');
       setNewItemPdfName('');
+      setNewItemPdfs([]);
       setShowAddModal(false);
     } else {
       alert('업로드 도중 오류가 발생했습니다: update handler is missing.');
@@ -202,15 +223,19 @@ export default function GallerySection({ state, currentSubTab, onViewPdf, onUpda
   };
 
   const handleOpenPdfDirectly = (item: GalleryItem) => {
+    // If the item has multiple files, open the first one by default when clicked directly on thumbnails
+    const base64 = item.pdfFiles && item.pdfFiles.length > 0 ? item.pdfFiles[0].base64 : item.pdfBase64;
+    const name = item.pdfFiles && item.pdfFiles.length > 0 ? item.pdfFiles[0].name : (item.files?.[0] || `${item.title}_portfolio.pdf`);
+
     const reportSim = {
       id: `sim-gallery-${item.id}`,
       type: 'plan',
       title: `[포트폴리오] ${item.grade} - ${item.title}`,
       desc: item.description,
-      filename: item.files?.[0] || `${item.title}_portfolio.pdf`,
+      filename: name,
       uploadDate: item.date,
       pdfContentSim: item.pdfContentSim || item.description,
-      pdfBase64: item.pdfBase64
+      pdfBase64: base64
     };
     onViewPdf(reportSim);
   };
@@ -405,25 +430,59 @@ export default function GallerySection({ state, currentSubTab, onViewPdf, onUpda
                     </div>
                   )}
 
-                  {item.pdfBase64 && (
-                    <div className="pt-2 mt-1.5 border-t border-neutral-150 flex items-center justify-between">
-                      <span className="text-[10px] text-red-600 font-mono truncate max-w-[130px] font-bold">
-                        📄 {item.files?.[0] || `${item.title}_portfolio.pdf`}
-                      </span>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleOpenPdfDirectly(item);
-                        }}
-                        className="px-2 py-1 bg-red-50 hover:bg-red-100 text-red-650 border border-red-200 rounded-md font-sans font-bold text-[10px] select-none cursor-pointer transition-all flex items-center gap-1 shadow-3xs"
-                      >
-                        <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span>
-                        <span>PDF 포폴보기</span>
-                      </button>
+                  {/* Multiple PDFs support inside the card */}
+                  {((item.pdfFiles && item.pdfFiles.length > 0) || item.pdfBase64) && (
+                    <div className="pt-2 mt-1.5 border-t border-neutral-150 space-y-1.5">
+                      {item.pdfFiles && item.pdfFiles.length > 0 ? (
+                        item.pdfFiles.map((pdf, pIdx) => (
+                          <div key={pIdx} className="flex items-center justify-between gap-2">
+                            <span className="text-[10px] text-neutral-605 font-mono truncate max-w-[130px] font-bold" title={pdf.name}>
+                              📄 {pdf.name}
+                            </span>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const fileSim = {
+                                  id: `sim-gallery-${item.id}-${pIdx}`,
+                                  type: 'plan',
+                                  title: `[포트폴리오] ${item.grade} - ${item.title} (${pIdx + 1})`,
+                                  desc: item.description,
+                                  filename: pdf.name,
+                                  uploadDate: item.date,
+                                  pdfContentSim: item.pdfContentSim || item.description,
+                                  pdfBase64: pdf.base64
+                                };
+                                onViewPdf(fileSim);
+                              }}
+                              className="px-1.5 py-0.5 bg-red-50 hover:bg-red-100 text-red-650 border border-red-200 rounded-md font-sans font-bold text-[9px] select-none cursor-pointer transition-all flex items-center gap-1 shadow-3xs shrink-0"
+                            >
+                              <span className="w-1 h-1 rounded-full bg-red-500 animate-pulse"></span>
+                              <span>열기</span>
+                            </button>
+                          </div>
+                        ))
+                      ) : (
+                        // Fallback to legacy single pdf format
+                        <div className="flex items-center justify-between gap-1.5">
+                          <span className="text-[10px] text-red-650 font-mono truncate max-w-[130px] font-bold">
+                            📄 {item.files?.[0] || `${item.title}_portfolio.pdf`}
+                          </span>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleOpenPdfDirectly(item);
+                            }}
+                            className="px-2 py-1 bg-red-50 hover:bg-red-100 text-red-650 border border-red-200 rounded-md font-sans font-bold text-[10px] select-none cursor-pointer transition-all flex items-center gap-1 shadow-3xs shrink-0"
+                          >
+                            <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span>
+                            <span>PDF 보기</span>
+                          </button>
+                        </div>
+                      )}
                     </div>
                   )}
 
-                  {item.category !== 'Portfolio' && item.files?.length > 0 && (
+                  {item.category !== 'Portfolio' && !item.pdfBase64 && (!item.pdfFiles || item.pdfFiles.length === 0) && item.files?.length > 0 && (
                     <div className="pt-2 mt-1.5 border-t border-neutral-50 flex items-center justify-between text-[10.5px]">
                       <span className="text-neutral-400 font-mono truncate max-w-[170px]" title={item.files[0]}>
                         📎 {item.files[0]}
@@ -505,18 +564,53 @@ export default function GallerySection({ state, currentSubTab, onViewPdf, onUpda
             <p className="text-neutral-400 leading-relaxed text-justify">
               {lightboxItem.description}
             </p>
-            {lightboxItem.pdfBase64 && (
-              <div className="pt-2 border-t border-neutral-800/80 flex justify-between items-center">
-                <span className="text-[11px] text-neutral-400 font-semibold">📄 PDF 포트폴리오 첨부됨</span>
-                <button
-                  onClick={() => {
-                    handleOpenPdfDirectly(lightboxItem);
-                  }}
-                  className="px-3 py-1.5 bg-red-600 hover:bg-red-500 text-white border border-red-500 rounded-lg text-xs font-bold font-sans cursor-pointer transition-all flex items-center gap-1.5"
-                >
-                  <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></span>
-                  <span>PDF 뷰어로 열기</span>
-                </button>
+            {((lightboxItem.pdfFiles && lightboxItem.pdfFiles.length > 0) || lightboxItem.pdfBase64) && (
+              <div className="pt-2 border-t border-neutral-800/85 space-y-2">
+                <span className="text-[11px] text-neutral-400 font-bold">📄 첨부된 PDF 포트폴리오 문서 목록 ({lightboxItem.pdfFiles?.length || 1}개)</span>
+                <div className="space-y-1.5 max-h-32 overflow-y-auto pr-1">
+                  {lightboxItem.pdfFiles && lightboxItem.pdfFiles.length > 0 ? (
+                    lightboxItem.pdfFiles.map((pdf, pIdx) => (
+                      <div key={pIdx} className="flex justify-between items-center bg-black/40 p-2 border border-neutral-800 rounded">
+                        <span className="text-[11px] text-neutral-350 font-mono truncate max-w-[320px] sm:max-w-[450px]" title={pdf.name}>{pdf.name}</span>
+                        <button
+                          onClick={() => {
+                            const fileSim = {
+                              id: `sim-gallery-${lightboxItem.id}-${pIdx}`,
+                              type: 'plan',
+                              title: `[포트폴리오] ${lightboxItem.grade} - ${lightboxItem.title}`,
+                              desc: lightboxItem.description,
+                              filename: pdf.name,
+                              uploadDate: lightboxItem.date,
+                              pdfContentSim: lightboxItem.pdfContentSim || lightboxItem.description,
+                              pdfBase64: pdf.base64
+                            };
+                            onViewPdf(fileSim);
+                          }}
+                          className="px-2 py-1 bg-red-650 hover:bg-red-550 text-white rounded text-[10px] font-bold font-sans cursor-pointer transition-all flex items-center gap-1 shrink-0"
+                        >
+                          <span className="w-1 h-1 rounded-full bg-white animate-pulse"></span>
+                          <span>PDF 열기</span>
+                        </button>
+                      </div>
+                    ))
+                  ) : (
+                    // Legacy single PDF file
+                    <div className="flex justify-between items-center bg-black/40 p-2 border border-neutral-800 rounded">
+                      <span className="text-[11px] text-neutral-350 font-mono truncate max-w-[320px] sm:max-w-[450px]">
+                        {lightboxItem.files?.[0] || `${lightboxItem.title}_portfolio.pdf`}
+                      </span>
+                      <button
+                        onClick={() => {
+                          handleOpenPdfDirectly(lightboxItem);
+                        }}
+                        className="px-3 py-1 bg-red-600 hover:bg-red-500 text-white border border-red-500 rounded text-xs font-bold font-sans cursor-pointer transition-all flex items-center gap-1 shrink-0"
+                      >
+                        <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></span>
+                        <span>PDF 열기</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
             <div className="pt-2 border-t border-neutral-800 flex justify-between items-center text-[11px] text-neutral-500">
@@ -666,38 +760,52 @@ export default function GallerySection({ state, currentSubTab, onViewPdf, onUpda
 
               {/* PDF Documents Upload */}
               <div className="p-3 bg-red-50/50 rounded-xl border border-red-100 space-y-2 font-sans">
-                <label className="font-bold text-red-800 block">📄 [선택] 실제 PDF 포트폴리오 원본 동반 탑재</label>
+                <label className="font-bold text-red-800 block">📄 [선택] 실제 PDF 포트폴리오 원본 동반 탑재 (다중 선택 가능)</label>
                 <div className="flex flex-col sm:flex-row sm:items-center gap-3">
                   <label className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-bold block text-center cursor-pointer flex items-center gap-1 shrink-0 w-fit transition-all shadow-xs">
                     <Upload className="w-4 h-4" />
-                    <span>PDF 파일 선택</span>
+                    <span>PDF 파일 선택 (다중)</span>
                     <input
                       type="file"
                       accept="application/pdf"
+                      multiple
                       className="hidden"
                       onChange={handleNewPdfAdd}
                     />
                   </label>
-                  <div className="text-[11px]">
-                    {newItemPdfBase64 ? (
-                      <div className="flex items-center gap-2 text-emerald-700 font-bold">
-                        <span>✔️ 등록 완료: {newItemPdfName}</span>
+                  <span className="text-neutral-500 text-[11px]">* 학교 학습지, 탐구성찰 산출지 등 PDF 문서들을 여러 개 탑재할 수 있습니다.</span>
+                </div>
+
+                {/* Selected PDFs List */}
+                {newItemPdfs.length > 0 && (
+                  <div className="mt-2 space-y-1.5 bg-white p-2.5 rounded-lg border border-red-100 max-h-40 overflow-y-auto">
+                    <p className="text-[10.5px] text-neutral-400 font-bold mb-1">첨부 지정된 PDF 파일 ({newItemPdfs.length}개):</p>
+                    {newItemPdfs.map((pdf, idx) => (
+                      <div key={idx} className="flex items-center justify-between gap-2 p-1 bg-neutral-50/50 border border-neutral-100 rounded">
+                        <span className="text-[11px] text-neutral-700 font-bold font-mono truncate max-w-[220px] sm:max-w-md block">📄 {pdf.name}</span>
                         <button
                           type="button"
                           onClick={() => {
-                            setNewItemPdfBase64('');
-                            setNewItemPdfName('');
+                            setNewItemPdfs(prev => {
+                              const remaining = prev.filter((_, i) => i !== idx);
+                              if (remaining.length === 0) {
+                                setNewItemPdfBase64('');
+                                setNewItemPdfName('');
+                              } else {
+                                setNewItemPdfBase64(remaining[0].base64);
+                                setNewItemPdfName(remaining[0].name);
+                              }
+                              return remaining;
+                            });
                           }}
-                          className="text-red-600 hover:text-red-800 underline cursor-pointer"
+                          className="text-red-500 hover:text-red-700 text-xs font-bold shrink-0 cursor-pointer"
                         >
                           제거
                         </button>
                       </div>
-                    ) : (
-                      <span className="text-neutral-500">* PDF 포트폴리오 파일(학습지, 탐구성찰 산출지 등)을 탑재할 수 있습니다.</span>
-                    )}
+                    ))}
                   </div>
-                </div>
+                )}
               </div>
 
               {/* Submit / Cancel Actions */}
