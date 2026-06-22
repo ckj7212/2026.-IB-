@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { AppState, ReportItem, LessonItem, GalleryItem, ResearchTaskItem, QuantitativeMetric, QualitativeFeedback } from '../types';
-import { ShieldAlert, LogOut, CheckCircle, Save, Plus, Trash2, Edit3, Image, Upload, FileJson, ArrowDown, Sparkles } from 'lucide-react';
+import { ShieldAlert, LogOut, CheckCircle, Save, Plus, Trash2, Edit3, Image, Upload, FileJson, ArrowDown, Sparkles, RefreshCw, Database, Laptop, Smartphone } from 'lucide-react';
 
 interface AdminPanelProps {
   state: AppState;
@@ -43,6 +43,7 @@ export default function AdminPanel({ state, onUpdateState, onClose, isAdminMode,
   const [selectedPostToEdit, setSelectedPostToEdit] = useState<string | null>(null);
   const [postEditTitle, setPostEditTitle] = useState('');
   const [postEditContent, setPostEditContent] = useState('');
+  const [isSyncing, setIsSyncing] = useState(false);
 
   // Authorization code check (Required: IBGR251125)
   const handleAuthSubmit = (e: React.FormEvent) => {
@@ -672,6 +673,82 @@ export default function AdminPanel({ state, onUpdateState, onClose, isAdminMode,
       }
     };
     reader.readAsText(file);
+  };
+
+  const forcePushCloud = async () => {
+    if (!confirm('⚠️ 경고: 정말로 현재 기기에 표시된 이 화면 상태를 "정식 클라우드 마스터 버전"으로 강제 선포하시겠습니까?\n\n이 기기의 데이터가 서버에 덮어씌워지며, 핸드폰을 포함해 접속하고 있는 모든 기기들의 화면이 이 기준으로 "일제히 강제 통일"전파됩니다.')) {
+      return;
+    }
+    setIsSyncing(true);
+    try {
+      const stateToSave = {
+        ...state,
+        updatedAt: Date.now()
+      };
+      const res = await fetch('/api/state', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(stateToSave)
+      });
+      if (res.ok) {
+        // Update IndexedDB & LocalStorage
+        localStorage.setItem('bitgaram_ib_pyp_portal_state', JSON.stringify(stateToSave));
+        try {
+          const { storeAsset } = await import('../lib/idb');
+          await storeAsset('app_state_v2', stateToSave);
+        } catch (dbErr) {
+          console.warn("IndexedDB update during force push failed:", dbErr);
+        }
+        onUpdateState(stateToSave);
+        alert('🚀 [통합 선포 완료] 현재 기기의 모든 화면 데이터 설정을 클라우드 마스터 서버에 강제 기록하였습니다! 다른 모든 기기(핸드폰, PC 등)에서도 5초 내에 이 버전으로 즉시 강제 통일화됩니다.');
+      } else {
+        throw new Error(`서버 응답 오류 (코드: ${res.status})`);
+      }
+    } catch (err) {
+      alert('⚠️ 클라우드 전송 중 오류가 발생했습니다: ' + err);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const forcePullCloud = async () => {
+    if (!confirm('🔄 정말로 클라우드 서버의 공식 마스터 버전을 강제로 당겨와 현재 이 기기를 갱신하시겠습니까?\n\n현재 이 기기 브라우저에 임시 저장된 기존 상태 캐시들을 무시하고 삭제한 다음, 서버의 정식 등록본으로 100% 강제 원상 복귀 및 리셋화합니다.')) {
+      return;
+    }
+    setIsSyncing(true);
+    try {
+      const res = await fetch(`/api/state?_t=${Date.now()}`, {
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        }
+      });
+      if (res.ok) {
+        const serverState = await res.json();
+        if (serverState && serverState.config && serverState.basicInfo) {
+          // Clear and set local storage
+          localStorage.setItem('bitgaram_ib_pyp_portal_state', JSON.stringify(serverState));
+          try {
+            const { storeAsset } = await import('../lib/idb');
+            await storeAsset('app_state_v2', serverState);
+          } catch (dbErr) {
+            console.warn("IndexedDB overwrite during force pull failed:", dbErr);
+          }
+          onUpdateState(serverState);
+          alert('🌐 [마스터 다운로드 성공] 클라우드 서버의 최신 마스터 버전을 성공적으로 수신하여 이 기기의 로컬 기억소를 통일화했습니다. 기기 캐시 불일치 문제가 말끔하게 치유되고 정리되었습니다!');
+        } else {
+          alert('⚠️ 서버의 데이터가 정상적인 마스터 형식이 아닙니다.');
+        }
+      } else {
+        throw new Error(`서버 응답 오류 (코드: ${res.status})`);
+      }
+    } catch (err) {
+      alert('⚠️ 클라우드 로드 중 오류가 발생했습니다: ' + err);
+    } finally {
+      setIsSyncing(false);
+    }
   };
 
 
@@ -3251,10 +3328,110 @@ export default function AdminPanel({ state, onUpdateState, onClose, isAdminMode,
             {activeTab === 'backup' && (
               <div className="space-y-6 text-xs sm:text-sm font-sans select-text">
                 <div>
-                  <h2 className="text-base font-extrabold text-neutral-950">데이터 영속성 백업 및 재구조화 보강국</h2>
+                  <h2 className="text-base font-extrabold text-neutral-950">데이터 영속성 백업 및 기기별 동기화 제어소</h2>
                   <p className="text-xs text-neutral-500 mt-1">
-                    "데이터 백업 가능 구조" 충족을 위해 현 포털의 모든 학풍, 글, 갤러리 설정 데이터를 단 한 장의 표준 JSON 파일로 패킹하여 로컬에 저장하거나 원상 복제해냅니다.
+                    "데이터 백업 가능 구조" 충족 및 기기 독립적 동기화 확보를 위해 단일 구조 제어 타워와 패킹용 표준 JSON 추출 기능국을 일체에 정렬합니다.
                   </p>
+                </div>
+
+                {/* Real-time Cloud Sync Control Tower Card */}
+                <div className="p-6 rounded-2xl bg-gradient-to-br from-neutral-900 to-neutral-950 text-white border border-neutral-800 shadow-xl space-y-6">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-neutral-800 pb-4">
+                    <div className="flex items-center gap-2.5">
+                      <div className="p-2 bg-amber-500/10 rounded-xl border border-amber-500/20 text-amber-400">
+                        <RefreshCw className={`w-5 h-5 ${isSyncing ? 'animate-spin' : ''}`} />
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-black text-amber-400 uppercase tracking-wider">클라우드 통합 데이터 지휘 통제소 (Multi-Device Sync Control Tower)</h3>
+                        <p className="text-[10.5px] text-neutral-400 font-sans tracking-tight mt-0.5">핸드폰과 PC 간의 데이터 불일치가 일어났을 때, 특정 기기 기준 배포 혹은 원격 동기화를 해결하는 마스터 타워입니다.</p>
+                      </div>
+                    </div>
+                    <div>
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 text-[10px] font-black border border-emerald-500/20">
+                        <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-ping"></span>
+                        <span>LIVE 연동 활성화</span>
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Status Indicator Panel */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                    <div className="p-3.5 bg-neutral-900/60 rounded-xl border border-neutral-800/80 space-y-1">
+                      <span className="text-[10.5px] text-neutral-500 block font-bold uppercase tracking-wider">💻 분석 대상 기기(Device)</span>
+                      <div className="flex items-center gap-1.5 font-bold text-neutral-200">
+                        <span className="hidden md:inline-flex items-center gap-1 text-xs">
+                          <Laptop className="w-3.5 h-3.5 text-blue-400" />
+                          <span>데스크탑 PC 환경</span>
+                        </span>
+                        <span className="md:hidden inline-flex items-center gap-1 text-xs">
+                          <Smartphone className="w-3.5 h-3.5 text-amber-400" />
+                          <span>모바일/태블릿 환경</span>
+                        </span>
+                      </div>
+                    </div>
+                    <div className="p-3.5 bg-neutral-900/60 rounded-xl border border-neutral-800/80 space-y-1 font-mono">
+                      <span className="text-[10.5px] text-neutral-500 block font-bold text-sans uppercase tracking-wider">💾 본 기기 상태 수집 크기</span>
+                      <div className="flex items-center gap-1.5 font-black text-neutral-205">
+                        <Database className="w-3.5 h-3.5 text-indigo-400" />
+                        <span>{state ? (JSON.stringify(state).length / 1024).toFixed(1) : "0"} KB (JSON)</span>
+                      </div>
+                    </div>
+                    <div className="p-3.5 bg-neutral-900/60 rounded-xl border border-neutral-800/80 space-y-1">
+                      <span className="text-[10.5px] text-neutral-500 block font-bold uppercase tracking-wider">⏱️ 기기 데이터 최종 갱신인</span>
+                      <div className="flex items-center gap-1 text-xs font-mono font-bold text-amber-300">
+                        <span>{state.updatedAt ? new Date(state.updatedAt).toLocaleString('ko-KR') : '시간 기록 없음'}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Operational Core Actions */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                    
+                    {/* Action 1: Force Outward Deploy */}
+                    <div className="p-4 bg-amber-500/5 hover:bg-amber-500/8 transition-colors rounded-xl border border-amber-500/10 space-y-3 flex flex-col justify-between">
+                      <div className="space-y-1.5">
+                        <span className="text-[10px] px-2 py-0.5 rounded-sm bg-amber-500/10 text-amber-400 font-bold tracking-wider font-mono">ACTION A</span>
+                        <h4 className="text-xs sm:text-sm font-extrabold text-neutral-100 flex items-center gap-1.5">
+                          <span>🚀 이 기기 화면 기준으로 전체 통합</span>
+                        </h4>
+                        <p className="text-[11px] text-neutral-400 leading-relaxed text-justify">
+                          <strong>"내 핸드폰(기기)에 표시된 모든 변경 사항이 완벽하니 다른 기기도 똑같이 보여라!"</strong> 할 때 사용합니다. 현재 사용하시는 본 이 기기의 화면 데이터를 강제로 클라우드 서버 마스터로 등재해버림으로써, 타 노트북/PC/모바일 등 모든 접속 기기에 이 데이터가 즉시 덮어씌워져 일제 전파 통일됩니다.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={forcePushCloud}
+                        disabled={isSyncing}
+                        className="w-full mt-3 py-2.5 bg-amber-500 hover:bg-amber-600 disabled:bg-neutral-800 text-neutral-950 hover:text-neutral-950 font-black rounded-lg text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-md select-none"
+                      >
+                        <Upload className="w-3.5 h-3.5 text-neutral-950" />
+                        <span>현재 기기 기준으로 클라우드 서버 덮어쓰기 (배포 통합)</span>
+                      </button>
+                    </div>
+
+                    {/* Action 2: Force Inward Reset */}
+                    <div className="p-4 bg-neutral-900/90 hover:bg-neutral-900 transition-colors rounded-xl border border-neutral-800 space-y-3 flex flex-col justify-between">
+                      <div className="space-y-1.5">
+                        <span className="text-[10px] px-2 py-0.5 rounded-sm bg-neutral-800 text-neutral-400 font-bold tracking-wider font-mono">ACTION B</span>
+                        <h4 className="text-xs sm:text-sm font-extrabold text-neutral-100 flex items-center gap-1.5">
+                          <span>🔄 서버 최신 데이터 가져와 갱신</span>
+                        </h4>
+                        <p className="text-[11px] text-neutral-400 leading-relaxed text-justify">
+                          <strong>"혹시 내 기기나 모바일의 기존 브라우저 캐시 기억이 꼬였거나 오래되었으니 쇄신시켜라!"</strong> 할 때 사용합니다. 서버 측 보관 상태인 공식 마스터를 그대로 호출해 와서 현재 기기의 꼬여있는 내부 브라우저 임시 캐시(LocalStorage/IndexedDB)를 강제로 격파하고 똑같이 완전 리셋 갱합합니다.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={forcePullCloud}
+                        disabled={isSyncing}
+                        className="w-full mt-3 py-2.5 bg-neutral-800 hover:bg-neutral-700 disabled:bg-neutral-850 text-white font-black rounded-lg text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer border border-neutral-700 select-none"
+                      >
+                        <RefreshCw className="w-3.5 h-3.5 text-neutral-300" />
+                        <span>서버의 정식 마스터 데이터로 스마트폰 강제 로드 (기기 치유)</span>
+                      </button>
+                    </div>
+
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
