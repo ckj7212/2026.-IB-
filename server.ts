@@ -65,6 +65,63 @@ async function startServer() {
     }
   });
 
+  // API endpoint to download standard JSON backup file directly from server (avoids data: URI iframe blocks)
+  app.get("/api/backup-download", async (req, res) => {
+    try {
+      let stateToDownload = defaultData;
+      const firestoreState = await getPortalStateFromFirestore();
+      if (firestoreState) {
+        stateToDownload = firestoreState;
+      } else if (fs.existsSync(STATE_FILE_PATH)) {
+        try {
+          const fileContent = fs.readFileSync(STATE_FILE_PATH, "utf-8");
+          stateToDownload = JSON.parse(fileContent);
+        } catch (readErr) {
+          console.warn("Failed to read local fallback backup file:", readErr);
+        }
+      }
+      
+      res.setHeader("Content-Disposition", `attachment; filename="bitgaram_pyp_portal_backup_${new Date().toISOString().substring(0,10)}.json"`);
+      res.setHeader("Content-Type", "application/json");
+      return res.json(stateToDownload);
+    } catch (err) {
+      console.error("Backup download API errored:", err);
+      res.status(500).json({ error: "Failed to assemble backup file download" });
+    }
+  });
+
+  // API endpoint to upload a JSON backup file and apply it server-side (propagating to all connected endpoints)
+  app.post("/api/backup-upload", async (req, res) => {
+    try {
+      const parsed = req.body;
+      if (!parsed || !parsed.config || !parsed.basicInfo) {
+        return res.status(400).json({ error: "Invalid backup file schema structure" });
+      }
+
+      parsed.updatedAt = Date.now();
+
+      // 1. Save to Firestore
+      let firebaseSaved = false;
+      try {
+        firebaseSaved = await savePortalStateToFirestore(parsed);
+      } catch (fbErr) {
+        console.error("Failed to save uploaded backup state to Firestore:", fbErr);
+      }
+
+      // 2. Save locally
+      try {
+        fs.writeFileSync(STATE_FILE_PATH, JSON.stringify(parsed, null, 2), "utf-8");
+      } catch (fsErr) {
+        console.warn("Failed to write uploaded backup state locally:", fsErr);
+      }
+
+      return res.json({ success: true, firebaseSaved, state: parsed });
+    } catch (err) {
+      console.error("Backup upload API errored:", err);
+      return res.status(500).json({ error: "Failed to apply uploaded backup" });
+    }
+  });
+
   // API endpoint to save state modifications permanently in the codebase and Cloud Firestore
   app.post("/api/state", async (req, res) => {
     try {

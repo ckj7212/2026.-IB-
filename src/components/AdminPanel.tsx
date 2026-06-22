@@ -645,31 +645,61 @@ export default function AdminPanel({ state, onUpdateState, onClose, isAdminMode,
 
   // --- Backup and Restore Logic (데이터 백업 가능) ---
   const handleExportBackup = () => {
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(state, null, 2));
     const downloadAnchor = document.createElement('a');
-    downloadAnchor.setAttribute("href", dataStr);
-    downloadAnchor.setAttribute("download", `bitgaram_pyp_portal_state_backup_${new Date().toISOString().substring(0,10)}.json`);
+    downloadAnchor.setAttribute("href", "/api/backup-download");
+    downloadAnchor.setAttribute("target", "_blank");
     document.body.appendChild(downloadAnchor);
     downloadAnchor.click();
     downloadAnchor.removeChild(downloadAnchor);
   };
 
-  const handleImportBackup = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImportBackup = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
       try {
         const parsed = JSON.parse(event.target?.result as string);
-        if (parsed && parsed.config && parsed.basicInfo && parsed.reports) {
-          onUpdateState(parsed);
-          alert('빛가람초 상태 데이터 전체 복원 백업 적용에 성료했습니다!');
+        if (parsed && parsed.config && parsed.basicInfo) {
+          setIsSyncing(true);
+          try {
+            const res = await fetch('/api/backup-upload', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify(parsed)
+            });
+            if (res.ok) {
+              const result = await res.json();
+              if (result.success && result.state) {
+                // Update local memory too
+                localStorage.setItem('bitgaram_ib_pyp_portal_state', JSON.stringify(result.state));
+                try {
+                  const { storeAsset } = await import('../lib/idb');
+                  await storeAsset('app_state_v2', result.state);
+                } catch (dbErr) {
+                  console.warn("IndexedDB overwrite failed during import:", dbErr);
+                }
+                onUpdateState(result.state);
+                alert('🚀 [백업 복원 성공] 업로드된 백업 JSON 파일 데이터를 클라우드 서버 마스터와 이 기기에 영구 탑재 완료했습니다! 즉시 모든 모바일 및 PC 기기의 화면들이 통합 갱신됩니다.');
+              } else {
+                throw new Error("서버에서 백업 복원에 실패했습니다.");
+              }
+            } else {
+              throw new Error(`백업 전송 실패 (서버 코드: ${res.status})`);
+            }
+          } catch (uploadErr) {
+            alert('⚠️ 백업 복원 중 서버 연동 오류가 발생했습니다: ' + uploadErr);
+          } finally {
+            setIsSyncing(false);
+          }
         } else {
-          alert('체계에 불일치하는 백업 파일 구조입니다. 속성을 감정해보세요.');
+          alert('⚠️ 적합한 빛가람초 포털 백업 JSON 파일 규격이 아닙니다. 속성을 확인해주세요.');
         }
       } catch (err) {
-        alert('JSON 복원 분석에 난국이 발생했습니다: ' + err);
+        alert('JSON 파일 복원 및 로드 중 오류가 발생했습니다: ' + err);
       }
     };
     reader.readAsText(file);
